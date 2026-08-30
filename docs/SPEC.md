@@ -1,8 +1,8 @@
-# PPL Language Specification — Draft 0.3
+# PPL Language Specification — Draft 0.4
 
 ## 1. Purpose
 
-PPL (Prompt Programming Language) is an AI-native, intent-oriented programming language. A PPL application expresses data, deterministic control flow, cognitive operations, enterprise knowledge, memory, tools, and human decisions without embedding a model-provider API in application source.
+PPL (Prompt Programming Language) is an AI-native, intent-oriented programming language. A PPL application expresses data, deterministic control flow, cognitive operations, enterprise knowledge, memory, tools, human decisions, governance, and evaluation without embedding a model-provider API in application source.
 
 ## 2. Execution classes
 
@@ -14,97 +14,50 @@ PPL (Prompt Programming Language) is an AI-native, intent-oriented programming l
 
 ```text
 Source -> AST -> Semantic Validation -> PIR -> Runtime
+                                      |
+                                      +-> Policy / Guard evaluation
+                                      +-> AI Gateway
+                                      +-> Knowledge / Memory / Tools
+                                      +-> Human interface
 ```
 
-PIR is provider-neutral. The runtime selects model adapters, knowledge providers, memory stores, tool adapters, and human interfaces.
+## 4. 0.4 governance surface
 
-## 4. 0.3 language surface
+### GUARD
 
-### APP
-Defines the application.
-
-### INPUT
-Defines an input object and typed fields.
-
-### MODEL_POLICY
-Defines provider-neutral routing and execution preferences.
+Declares a non-negotiable runtime constraint.
 
 ```text
-MODEL_POLICY EnterpriseDefault
-    reasoning: reasoning-default
-    classification: classification-default
-    extraction: extraction-default
-    max_retries: 2
-    fallback: fallback-default
+GUARD ProductionChange
+    NEVER execute production changes
+        without authorization
 ```
 
-### KNOWLEDGE
-Declares external authoritative context sources.
+A guard is a runtime policy, not a model instruction. The runtime MUST evaluate applicable guards before executing a protected action.
+
+### AUTHORIZATION
+
+Defines the capability scope required for an operation.
 
 ```text
-KNOWLEDGE ITOperations
-    SOURCE incident_history
-    SOURCE runbooks
-    SOURCE architecture_documents
+AUTHORIZATION production_change
+    REQUIRES production.write
 ```
 
-### MEMORY
-Declares application-owned historical or stateful information.
+The runtime SHOULD fail closed when authorization cannot be established.
+
+### ENVIRONMENT
+
+Allows policies to distinguish development, test, staging, and production execution.
 
 ```text
-MEMORY IncidentHistory
-    KEY incident.id
-    READ incidents
-    WRITE outcomes
+ENVIRONMENT production
+    REQUIRES production.write
 ```
 
-### TOOL
-Declares an executable external capability. The runtime owns authentication, transport, retries, and connector details.
+## 5. Human approval
 
-```text
-TOOL ServiceManagement
-    ACTION create_ticket
-    INPUT
-        title: TEXT
-        description: TEXT
-        priority: TEXT
-    OUTPUT
-        ticket_id: ID
-```
-
-### AGENT
-Defines a named cognitive worker.
-
-```text
-AGENT Analyzer
-    USE KNOWLEDGE ITOperations
-    USE MEMORY IncidentHistory
-    POLICY EnterpriseDefault
-```
-
-### CLASSIFY
-Constrains a cognitive result to a declared set of categories and produces a confidence value.
-
-### EXTRACT
-Produces schema-bound fields from available context.
-
-### REASON
-Defines a natural-language reasoning objective. Optional `OUTPUT:` entries inside `REASON` define the result schema.
-
-```text
-REASON
-    determine whether the incident is repetitive
-    OUTPUT:
-        repetitive: BOOLEAN
-        confidence: CONFIDENCE
-        evidence: TEXT
-```
-
-### CALL
-Invokes a declared tool action. Tool calls are deterministic at the program-control level even when a cognitive agent chooses the arguments.
-
-### HUMAN_APPROVAL
-Suspends execution until an authorized human decision is received.
+`HUMAN_APPROVAL` is a first-class execution state.
 
 ```text
 HUMAN_APPROVAL
@@ -115,42 +68,90 @@ HUMAN_APPROVAL
         REJECT
 ```
 
-### WORKFLOW
-Defines orchestration over deterministic, cognitive, tool, and human operations.
-
-### RECEIVE / RUN / IF / ELSE IF / ELSE / RETURN
-Core workflow control constructs.
-
-## 5. Knowledge semantics
-
-Knowledge sources are external context, not mutable application variables. A cognitive operation may declare one or more knowledge scopes. The runtime is responsible for retrieval, ranking, context assembly, and provenance.
-
-Every production knowledge provider SHOULD expose provenance metadata including source identifier and retrieval location.
-
-## 6. Memory semantics
-
-Memory is persistent application state and is distinct from knowledge:
-
-- **Knowledge** = external authoritative information.
-- **Memory** = application-owned historical or stateful information.
-
-Memory reads and writes are observable and should be explicit.
-
-## 7. Tool semantics
-
-Tools are typed capabilities. Tool contracts define inputs and outputs; connector implementation is outside PPL source. Tool execution failures are surfaced as typed runtime errors rather than silently converted into cognitive responses.
-
-## 8. Human semantics
-
-`HUMAN_APPROVAL` is a first-class execution state.
+State model:
 
 ```text
 RUNNING -> WAITING_FOR_HUMAN -> RESUMED | REJECTED | EXPIRED
 ```
 
-Human decisions must be attributable to an execution context.
+The decision MUST be attributable to execution ID, actor, timestamp, question, options, and selected value.
 
-## 9. Structured cognitive output
+## 6. Evaluation surface
+
+### TEST
+
+Defines executable expectations over a representative input.
+
+```text
+TEST IncidentAdvisor
+    GIVEN incident.description = "database outage"
+    EXPECT Analyzer.category = DATABASE
+```
+
+### EVALUATION
+
+Defines dataset-level quality requirements.
+
+```text
+EVALUATION IncidentAdvisor
+    DATASET incident_test_set
+    METRIC classification_accuracy >= 0.95
+    METRIC unsupported_claim_rate <= 0.02
+```
+
+Evaluation is part of the application lifecycle and SHOULD run before production deployment.
+
+## 7. Provenance
+
+Every cognitive execution SHOULD retain:
+
+- execution ID
+- program version
+- source/prompt version
+- model and model version
+- policy version
+- knowledge sources used
+- memory reads/writes
+- tool calls
+- human decisions
+- validation result
+- outcome
+
+This creates an auditable chain from source intent to observed result.
+
+## 8. Runtime budgets
+
+0.4 introduces the concept of execution budgets:
+
+```text
+BUDGET
+    max_cost: 0.10
+    max_latency: 5000ms
+    max_steps: 25
+```
+
+A runtime MUST surface a budget violation rather than silently exceeding a declared hard limit.
+
+## 9. AI debugger and trace
+
+The runtime SHOULD expose a structured trace for every step:
+
+```text
+STEP 04
+OPERATION: REASON
+TYPE: C
+MODEL: reasoning-default
+LATENCY: 1240ms
+TOKENS: 723
+COST: 0.0042
+CONFIDENCE: 0.91
+VALIDATION: PASS
+STATUS: SUCCESS
+```
+
+The trace is diagnostic data and is not itself application state.
+
+## 10. Structured cognitive output
 
 Cognitive output MUST be schema-validated before being committed to program state.
 
@@ -170,40 +171,27 @@ CLASSIFICATION
 
 `CONFIDENCE` is normalized to `[0,1]`.
 
-## 10. Model policy semantics
+## 11. Failure semantics
 
-PPL source describes workload intent, not vendor APIs. `MODEL_POLICY` can specify preferred adapters, retries, fallbacks, and optimization objectives. A runtime MAY choose a different concrete model when policy permits.
+PPL distinguishes:
 
-The effective model and policy version MUST be traceable for each cognitive execution.
+- `VALIDATION_ERROR` — output violates the declared schema.
+- `AUTHORIZATION_ERROR` — required capability is unavailable.
+- `GUARD_VIOLATION` — a protected operation violates policy.
+- `TOOL_ERROR` — external capability failed.
+- `MODEL_ERROR` — model execution failed.
+- `BUDGET_EXCEEDED` — a hard runtime budget was exceeded.
+- `HUMAN_REJECTED` — an explicit human decision rejected the operation.
 
-## 11. Execution telemetry
+Errors SHOULD be observable and SHOULD NOT be hidden inside model-generated text.
 
-The runtime should record, where available:
-
-- operation type
-- model/provider
-- model version
-- policy version
-- input/output token counts
-- latency
-- retry count
-- fallback usage
-- cost estimate
-- confidence
-- validation result
-- knowledge provenance
-- tool execution result
-- human decision metadata
-
-## 12. Security and governance direction
-
-0.3 introduces the semantic building blocks for governed enterprise execution. `GUARD`, authorization scopes, environment controls, and policy enforcement remain planned for the next release.
-
-## 13. Design principles
+## 12. Design principles
 
 1. Intent over provider API.
 2. Deterministic shell around cognitive operations.
 3. Cognitive outputs are typed data, not free-form strings.
 4. Knowledge, memory, tools, and humans are first-class runtime concepts.
-5. Runtime behavior is observable and attributable.
-6. Application source remains portable across model providers.
+5. Governance is enforced by the runtime, not delegated to prompts.
+6. Evaluation is part of programming, not an afterthought.
+7. Runtime behavior is observable and attributable.
+8. Application source remains portable across model providers.
