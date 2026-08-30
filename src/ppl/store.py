@@ -153,20 +153,41 @@ class FileExecutionStore:
     def save(self, execution: Execution) -> None:
         path = self._path(execution.execution_id)
         lock = self._lock_path(execution.execution_id)
-        lock.write_text(str(os.getpid()), encoding="utf-8")
-        try:
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(execution_to_dict(execution), indent=2), encoding="utf-8")
-            tmp.replace(path)
-        finally:
-            if lock.exists():
-                lock.unlink(missing_ok=True)
+        last_error: OSError | None = None
+        for _ in range(8):
+            try:
+                lock.write_text(str(os.getpid()), encoding="utf-8")
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(execution_to_dict(execution), indent=2), encoding="utf-8")
+                tmp.replace(path)
+                last_error = None
+                break
+            except OSError as exc:
+                last_error = exc
+                time.sleep(0.02)
+            finally:
+                if lock.exists():
+                    try:
+                        lock.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+        if last_error is not None:
+            raise last_error
 
     def load(self, execution_id: str) -> Execution:
         path = self._path(execution_id)
         if not path.exists():
             raise KeyError(execution_id)
-        return execution_from_dict(json.loads(path.read_text(encoding="utf-8")))
+        last_error: OSError | None = None
+        for _ in range(8):
+            try:
+                return execution_from_dict(json.loads(path.read_text(encoding="utf-8")))
+            except OSError as exc:
+                last_error = exc
+                time.sleep(0.02)
+        if last_error is not None:
+            raise last_error
+        raise KeyError(execution_id)
 
     def exists(self, execution_id: str) -> bool:
         return self._path(execution_id).exists()

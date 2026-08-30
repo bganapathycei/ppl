@@ -6,9 +6,11 @@ PPL is an experimental AI-native programming language for expressing determinist
 
 PPL source is parsed into an AST, compiled into a portable Prompt Intermediate Representation (PIR), lowered into an execution graph, and run by a provider-neutral runtime with durable local state.
 
-## Current version: 0.9
+## Current version: 0.10
 
-PPL 0.9 makes the graph runtime real on a single machine:
+PPL 0.10 adds a multi-provider LLM registry. `.ppl` source stays vendor-free. Live adapters: OpenAI-compatible Chat Completions (OpenAI, OpenRouter, Groq, Ollama), native Anthropic, native Google Gemini, plus optional OpenAI Responses.
+
+PPL 0.9 made the graph runtime real on a single machine:
 
 - durable file-backed execution store
 - graph-driven interpretation of workflows
@@ -19,7 +21,7 @@ PPL 0.9 makes the graph runtime real on a single machine:
 - overlapping PARALLEL branches
 - local multiprocessing workers (`--workers N`)
 
-Still stubbed / out of scope: remote workers, Anthropic/Google adapters, IDE.
+Still out of scope: remote distributed workers, IDE, cross-provider fallback chains.
 
 Previous releases added:
 
@@ -30,6 +32,7 @@ Previous releases added:
 - 0.6 — real AI provider adapters
 - 0.7 — production-runtime foundations
 - 0.8 — execution-graph specification and primitives
+- 0.9 — durable graph runtime and local workers
 
 ## New developer? Start here
 
@@ -40,7 +43,7 @@ Previous releases added:
 5. Study [`examples/enterprise_automation.ppl`](examples/enterprise_automation.ppl).
 6. Read [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 7. Read [`docs/SPEC.md`](docs/SPEC.md).
-8. Study [`docs/PPL_0.9.md`](docs/PPL_0.9.md).
+8. Study [`docs/PPL_0.9.md`](docs/PPL_0.9.md) and [`docs/PPL_0.10.md`](docs/PPL_0.10.md).
 
 ## Quick start
 
@@ -66,7 +69,7 @@ ppl approve demo APPROVE --resume --file app.ppl
 ppl resume demo --file app.ppl
 ```
 
-The bundled local cognitive adapter remains deterministic for offline development. Real model execution is available through the provider-neutral AI runtime adapters (`PPL_AI_PROVIDER=openai`).
+The bundled local cognitive adapter remains deterministic for offline development. Real model execution uses `PPL_AI_PROVIDER` (`openai`, `openrouter`, `anthropic`, `google`, `groq`, `ollama`, …). See [`docs/REAL_AI_RUNTIME.md`](docs/REAL_AI_RUNTIME.md).
 
 ## Architecture
 
@@ -101,6 +104,7 @@ Parser -> AST -> Semantic Checks -> PIR
 - `docs/EXAMPLES.md` — examples and learning path
 - `docs/SPEC.md` — canonical language specification
 - `docs/PPL_0.9.md` — durable runtime and local workers
+- `docs/PPL_0.10.md` — multi-provider LLM adapters
 - `docs/REAL_AI_RUNTIME.md` — real model setup
 - `examples/` — language and runtime examples
 - `src/ppl/` — reference implementation

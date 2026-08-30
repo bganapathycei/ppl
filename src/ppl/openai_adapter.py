@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .real_ai import OpenAIModelAdapter as OpenAIAdapter
+from .providers.openai_compatible import OpenAICompatibleAdapter as OpenAIAdapter
 
 __all__ = ["OpenAIAdapter"]

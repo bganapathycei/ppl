@@ -1,27 +1,50 @@
 # Running PPL with a Real Model
 
-PPL keeps model configuration outside `.ppl` source. This lets the same application run against different model providers.
+PPL keeps model configuration outside `.ppl` source. The same application can run against local, OpenAI, OpenRouter, Anthropic, Google, Groq, or Ollama.
 
 ## Local development
-
-The reference runtime can continue to use the local deterministic adapter for language and workflow development.
 
 ```bash
 ppl check examples/incident.ppl
 ppl compile examples/incident.ppl
+ppl run examples/incident.ppl
 ```
 
-## OpenAI-compatible execution
+Unset `PPL_AI_PROVIDER` (or set `local`) to use the deterministic adapter.
 
-Configure the environment:
+## Provider examples
 
 ```bash
+# OpenAI (Chat Completions — default live path)
 export PPL_AI_PROVIDER=openai
-export PPL_OPENAI_API_KEY="$OPENAI_API_KEY"
-export PPL_OPENAI_MODEL="gpt-4.1-mini"
+export OPENAI_API_KEY=...
+export PPL_AI_MODEL=gpt-4.1-mini
+
+# OpenRouter (route to Claude, Gemini, etc. without native SDKs)
+export PPL_AI_PROVIDER=openrouter
+export OPENROUTER_API_KEY=...
+export PPL_AI_MODEL=anthropic/claude-sonnet-4.5
+
+# Anthropic native
+export PPL_AI_PROVIDER=anthropic
+export ANTHROPIC_API_KEY=...
+export PPL_AI_MODEL=claude-sonnet-4-5
+
+# Google Gemini native
+export PPL_AI_PROVIDER=google
+export GOOGLE_API_KEY=...
+export PPL_AI_MODEL=gemini-2.5-flash
+
+# Any OpenAI-compatible host (Azure, Together, vLLM, …)
+export PPL_AI_PROVIDER=openai-compatible
+export PPL_AI_BASE_URL=https://your-host/v1
+export PPL_AI_API_KEY=...
+export PPL_AI_MODEL=your-model
 ```
 
-Never commit API keys or provider secrets to the repository.
+Never commit API keys.
+
+Optional `ppl.providers.json` in the working directory can set `provider` and `model`; environment variables still win.
 
 ## What happens at runtime
 
@@ -34,15 +57,14 @@ REASON / CLASSIFY / EXTRACT
           v
     CognitiveRuntime
           |
-          +--> retry
-          |
-          +--> fallback
+          +--> retry / same-adapter fallback
           |
           v
       AI Gateway
           |
           v
-    Model Adapter
+    Provider registry
+      local | openai-compat | anthropic | google | openai-responses
           |
           v
     AIResponse
@@ -56,19 +78,7 @@ REASON / CLASSIFY / EXTRACT
 
 ## Provider neutrality
 
-A PPL application should specify workload intent and optional policy, not vendor API calls. The runtime selects the adapter.
-
-A future deployment can therefore use:
-
-```text
-OpenAI
-Anthropic
-Google
-Local model
-Enterprise gateway
-```
-
-without rewriting the PPL program.
+A PPL application specifies workload intent and optional `MODEL_POLICY`, not vendor API calls. See [`docs/PPL_0.10.md`](PPL_0.10.md).
 
 ## Production checklist
 

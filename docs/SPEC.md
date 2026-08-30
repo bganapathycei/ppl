@@ -1,10 +1,10 @@
-# PPL Language Specification — Draft 0.9
+# PPL Language Specification — Draft 0.10
 
 ## 1. Purpose
 
 PPL (Prompt Programming Language) is an AI-native, intent-oriented programming language. A PPL application expresses data, deterministic control flow, cognitive operations, enterprise knowledge, memory, tools, human decisions, governance, evaluation, and graph orchestration without embedding a model-provider API in application source.
 
-As of 0.9, the reference runtime executes the compiled graph with durable local state, file-backed knowledge/memory, fail-closed tools, human pause/resume, WAIT predicates, overlapping PARALLEL branches, and an optional single-machine worker pool. Remote distributed workers remain a future concern.
+As of 0.10, the runtime selects a model adapter from configuration (`PPL_AI_PROVIDER` or `ppl.providers.json`) without embedding vendor APIs in application source. As of 0.9, the reference runtime executes the compiled graph with durable local state, file-backed knowledge/memory, fail-closed tools, human pause/resume, WAIT predicates, overlapping PARALLEL branches, and an optional single-machine worker pool. Remote distributed workers remain a future concern.
 
 
 ## 2. Execution classes

@@ -29,6 +29,7 @@ from .knowledge import (
 from .model_policy import resolve_policy
 from .production_runtime import InMemoryExecutionStore as ProdStore
 from .production_runtime import ProductionExecutor, StreamEvent
+from .providers.structured import substitute_policy_defaults
 from .store import FileExecutionStore, InMemoryGraphStore
 from .tools import build_tool_registry, resolve_action
 from .v03_runtime import HumanApproval
@@ -75,8 +76,12 @@ class Runtime:
         self.return_value = None
         self.execution: Execution | None = None
         self.steps_run = 0
+        default_model = os.getenv("PPL_AI_MODEL") or os.getenv("PPL_OPENAI_MODEL")
         self.policies = {
-            k: ModelPolicy(name=k, **{kk: vv for kk, vv in v.items() if kk != "name"})
+            k: substitute_policy_defaults(
+                ModelPolicy(name=k, **{kk: vv for kk, vv in v.items() if kk != "name"}),
+                default_model,
+            )
             for k, v in pir.get("model_policies", {}).items()
         }
         self.knowledge = load_knowledge_sources(pir.get("knowledge") or [], program_dir)
