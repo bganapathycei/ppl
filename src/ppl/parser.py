@@ -3,10 +3,9 @@ from .ast import *
 
 def clean_lines(text):
     lines=[]
-    for number, raw in enumerate(text.splitlines(),1):
+    for number,raw in enumerate(text.splitlines(),1):
         raw=raw.split('#',1)[0].rstrip()
-        if raw.strip():
-            indent=len(raw)-len(raw.lstrip(' ')); lines.append((number,indent,raw.strip()))
+        if raw.strip(): lines.append((number,len(raw)-len(raw.lstrip(' ')),raw.strip()))
     return lines
 
 class Parser:
@@ -33,19 +32,18 @@ class Parser:
             n,t=map(str.strip,line.split(':',1)); fields.append(InputField(n,t)); self.i+=1
         return InputDecl(name,fields)
     def parse_policy(self):
-        _,parent,line=self.lines[self.i]; name=line[len('MODEL_POLICY '):].strip(); self.i+=1
-        vals={}
+        _,parent,line=self.lines[self.i]; name=line[len('MODEL_POLICY '):].strip(); self.i+=1; vals={}
         while self.i<len(self.lines) and self.lines[self.i][1]>parent:
             _,_,line=self.lines[self.i]
-            if ':' in line:
-                k,v=map(str.strip,line.split(':',1)); vals[k.lower()]=v
+            if ':' in line: k,v=map(str.strip,line.split(':',1)); vals[k.lower()]=v
             self.i+=1
-        return ModelPolicyDecl(name, vals.get('reasoning','reasoning-default'), vals.get('classification','classification-default'), vals.get('extraction','extraction-default'), int(vals.get('max_retries','1')), vals.get('fallback','fallback-default'))
+        return ModelPolicyDecl(name,vals.get('reasoning','reasoning-default'),vals.get('classification','classification-default'),vals.get('extraction','extraction-default'),int(vals.get('max_retries','1')),vals.get('fallback','fallback-default'))
     def parse_agent(self):
-        _,parent,line=self.lines[self.i]; name=line[6:].strip(); self.i+=1; agent=AgentDecl(name)
+        _,parent,line=self.lines[self.i]; agent=AgentDecl(line[6:].strip()); self.i+=1
         while self.i<len(self.lines) and self.lines[self.i][1]>parent:
             _,indent,line=self.lines[self.i]
             if line.startswith('INPUT '): agent.input_name=line[6:].strip(); self.i+=1
+            elif line.startswith('POLICY '): agent.policy=line[7:].strip(); self.i+=1
             elif line.startswith('CLASSIFY '): agent.operations.append(self.parse_classify(indent))
             elif line=='EXTRACT': agent.operations.append(self.parse_extract(indent))
             elif line=='REASON': agent.operations.append(self.parse_reason(indent))
@@ -53,10 +51,10 @@ class Parser:
             else: self.error(f'Unexpected AGENT statement: {line}')
         return agent
     def parse_classify(self,op_indent):
-        _,_,line=self.lines[self.i]; target=line[len('CLASSIFY '):].strip(); self.i+=1; cats=[]
+        _,_,line=self.lines[self.i]; target=line[9:].strip(); self.i+=1; cats=[]
         while self.i<len(self.lines) and self.lines[self.i][1]>op_indent:
             _,_,line=self.lines[self.i]; cats.append(line); self.i+=1
-        return ClassifyOp(target,cats)
+        return ClassifyOp(target.removesuffix(' AS').strip(),cats)
     def parse_extract(self,op_indent):
         self.i+=1; fields=[]; schema={}
         while self.i<len(self.lines) and self.lines[self.i][1]>op_indent:
@@ -81,12 +79,9 @@ class Parser:
         while self.i<len(self.lines) and self.lines[self.i][1]>op_indent:
             _,_,line=self.lines[self.i]; fields.append(line); self.i+=1
         return fields
-    def _typed(self,line):
-        if ':' in line:
-            n,t=map(str.strip,line.split(':',1)); return n,t
-        return line,'TEXT'
+    def _typed(self,line): return tuple(map(str.strip,line.split(':',1))) if ':' in line else (line,'TEXT')
     def parse_workflow(self):
-        _,parent,line=self.lines[self.i]; name=line[9:].strip(); self.i+=1; return WorkflowDecl(name,self.parse_steps(parent))
+        _,parent,line=self.lines[self.i]; self.i+=1; return WorkflowDecl(line[9:].strip(),self.parse_steps(parent))
     def parse_steps(self,parent_indent):
         steps=[]
         while self.i<len(self.lines) and self.lines[self.i][1]>parent_indent:
