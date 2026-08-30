@@ -65,10 +65,34 @@ class LocalModelAdapter:
                 repetitive = any(x in context for x in ["repeated", "recurring", "again", "multiple", "historical"])
                 output = {"repetitive": repetitive, "confidence": 0.88 if repetitive else 0.72}
             elif "automation" in request.instruction.lower() or "candidate" in request.instruction.lower():
-                repetitive = "'repetitive': True" in context or '"repetitive": True' in context or "repetitive=True" in context
+                nested = request.input_data.get("context", request.input_data) if isinstance(request.input_data, dict) else {}
+                repetitive = isinstance(nested, dict) and nested.get("repetitive") is True
+                if not repetitive:
+                    lowered = str(request.input_data).lower()
+                    repetitive = "repetitive': true" in lowered or 'repetitive": true' in lowered
                 output = {"score": 86 if repetitive else 42, "rationale": "Repetitive and relatively deterministic remediation." if repetitive else "Insufficient evidence of a repeatable remediation pattern.", "confidence": 0.89 if repetitive else 0.76}
+            elif "safe" in request.instruction.lower():
+                output = {
+                    "safe": True,
+                    "confidence": 0.92,
+                    "rationale": "Change appears low risk and within policy.",
+                }
             else:
                 output = {"result": "REASONED", "confidence": 0.70}
+        for field, typ in request.schema.items():
+            if field in output:
+                continue
+            kind = typ.upper()
+            if kind == "BOOLEAN":
+                output[field] = bool(output.get("repetitive") or output.get("safe"))
+            elif kind == "CONFIDENCE":
+                output[field] = float(output.get("confidence", 0.7))
+            elif kind in {"NUMBER", "INTEGER"}:
+                output[field] = int(output.get("score", 0))
+            elif kind == "CLASSIFICATION" and request.categories:
+                output[field] = request.categories[0]
+            else:
+                output[field] = str(output.get("rationale") or output.get("root_cause") or "")
         latency = (time.perf_counter() - start) * 1000
         tokens = max(1, len(str(request.input_data).split()))
         return AIResponse(output, request.policy.reasoning_model, latency, tokens, max(1, len(str(output).split())), 0.001, 1)

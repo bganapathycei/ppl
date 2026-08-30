@@ -40,7 +40,7 @@ def test_checkpoint_resume():
         GraphNode("b", "b", ["a"]),
     ])
     execution = Execution(nodes=dict(graph.nodes))
-    store = GraphExecutor().store
+    executor = GraphExecutor()
 
     async def a(node, state):
         return "A"
@@ -48,6 +48,10 @@ def test_checkpoint_resume():
     async def b(node, state):
         return "B"
 
-    executor = GraphExecutor(store)
     finished = asyncio.run(executor.run(execution, {"a": a, "b": b}))
     assert finished.status.value == "SUCCEEDED"
+    executor.checkpoint(finished.execution_id, "after")
+    resumed = asyncio.run(executor.resume(finished.execution_id, {"a": a, "b": b}, "after"))
+    assert resumed.status.value == "SUCCEEDED"
+    assert resumed.nodes["a"].status is NodeStatus.SUCCEEDED
+

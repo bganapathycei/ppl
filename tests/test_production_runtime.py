@@ -1,7 +1,6 @@
-import pytest
+import asyncio
 
 from ppl.production_runtime import (
-    AsyncModelAdapter,
     InMemoryExecutionStore,
     PPLRuntimeError,
     ProductionExecutor,
@@ -25,8 +24,7 @@ class FakeAdapter:
         yield StreamEvent("COMPLETE", {"ok": True})
 
 
-@pytest.mark.asyncio
-async def test_retry_and_persisted_state(monkeypatch):
+def test_retry_and_persisted_state(monkeypatch):
     async def no_sleep(*args, **kwargs):
         return None
 
@@ -35,19 +33,23 @@ async def test_retry_and_persisted_state(monkeypatch):
     adapter = FakeAdapter()
     executor = ProductionExecutor(adapter, store)
 
-    result = await executor.execute({}, "exec-1", max_retries=1)
+    async def run():
+        return await executor.execute({}, "exec-1", max_retries=1)
 
+    result = asyncio.run(run())
     assert result == {"ok": True}
     assert adapter.calls == 2
     assert store.read("exec-1").status == "COMPLETED"
-    assert any(e["type"] == "ERROR" for e in store.read("exec-1").events)
+    assert any(event["type"] == "ERROR" for event in store.read("exec-1").events)
 
 
-@pytest.mark.asyncio
-async def test_streaming_events_are_persisted():
+def test_streaming_events_are_persisted():
     store = InMemoryExecutionStore()
     executor = ProductionExecutor(FakeAdapter(), store)
-    events = [event async for event in executor.stream({}, "exec-stream")]
 
-    assert [e.type for e in events] == ["DELTA", "COMPLETE"]
+    async def run():
+        return [event async for event in executor.stream({}, "exec-stream")]
+
+    events = asyncio.run(run())
+    assert [event.type for event in events] == ["DELTA", "COMPLETE"]
     assert store.read("exec-stream").status == "COMPLETED"

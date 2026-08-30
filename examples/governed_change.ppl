@@ -24,6 +24,10 @@ AGENT RiskAnalyzer
     REASON
         determine whether the proposed change is safe
         to execute automatically
+        OUTPUT:
+            safe: BOOLEAN
+            confidence: CONFIDENCE
+            rationale: TEXT
 
     OUTPUT
         safe: BOOLEAN

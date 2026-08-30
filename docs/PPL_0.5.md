@@ -34,4 +34,4 @@ README.md
   -> docs/SPEC.md
 ```
 
-0.5 remains intentionally lightweight. It improves the developer experience without prematurely freezing the language syntax.
+These commands are wired in the `ppl` CLI. `ppl fmt --write` updates a file in place. `ppl test` runs pytest when it is installed.

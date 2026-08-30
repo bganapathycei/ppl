@@ -44,8 +44,12 @@ Previous releases added:
 python -m pip install -e .
 ppl check examples/hello_world.ppl
 ppl compile examples/hello_world.ppl
+ppl run examples/hello_world.ppl
 ppl run examples/incident.ppl
 ppl trace examples/incident.ppl
+ppl run examples/governed_change.ppl
+ppl fmt examples/hello_world.ppl
+ppl test
 ```
 
 The bundled local cognitive adapter remains deterministic for offline development. Real model execution is available through the provider-neutral AI runtime adapters.
