@@ -1,8 +1,10 @@
-# Running PPL with a Real Model
+# Running PPL with a real model
 
 PPL keeps model configuration outside `.ppl` source. The same application can run against local, OpenAI, OpenRouter, Anthropic, Google, Groq, or Ollama.
 
-## Local development
+**Do this first:** complete [GETTING_STARTED.md](GETTING_STARTED.md) through the first `ppl run` on `examples/hello_world.ppl` with the default `local` adapter (no API key). Come back here only when you want a live model. Adapter details: [PPL_0.10.md](PPL_0.10.md).
+
+## 1. Confirm local development still works
 
 ```bash
 ppl check examples/incident.ppl
@@ -10,9 +12,11 @@ ppl compile examples/incident.ppl
 ppl run examples/incident.ppl
 ```
 
-Unset `PPL_AI_PROVIDER` (or set `local`) to use the deterministic adapter.
+Unset `PPL_AI_PROVIDER` (or set `local`) to use the deterministic adapter. No API key is required. If this fails, stop and fix install/PATH using Getting Started Steps 3–5 before configuring a provider.
 
-## Provider examples
+## 2. Choose a provider and set env vars (do not edit `.ppl` files)
+
+bash:
 
 ```bash
 # OpenAI (Chat Completions — default live path)
@@ -35,16 +39,35 @@ export PPL_AI_PROVIDER=google
 export GOOGLE_API_KEY=...
 export PPL_AI_MODEL=gemini-2.5-flash
 
+# Groq
+export PPL_AI_PROVIDER=groq
+export GROQ_API_KEY=...
+
+# Ollama (local server; API key optional)
+export PPL_AI_PROVIDER=ollama
+export PPL_AI_MODEL=llama3.2
+
 # Any OpenAI-compatible host (Azure, Together, vLLM, …)
 export PPL_AI_PROVIDER=openai-compatible
 export PPL_AI_BASE_URL=https://your-host/v1
 export PPL_AI_API_KEY=...
 export PPL_AI_MODEL=your-model
+
+ppl run examples/hello_world.ppl
 ```
 
-Never commit API keys.
+PowerShell:
 
-Optional `ppl.providers.json` in the working directory can set `provider` and `model`; environment variables still win.
+```powershell
+$env:PPL_AI_PROVIDER = "openai"
+$env:OPENAI_API_KEY = "..."
+$env:PPL_AI_MODEL = "gpt-4.1-mini"
+ppl run examples/hello_world.ppl
+```
+
+Never commit API keys. If a run fails with an auth error, unset `PPL_AI_PROVIDER` to return to `local`.
+
+Optional `ppl.providers.json` in the working directory can set `provider` and `model`; environment variables still win. Do not put `api_key` in a file that is committed.
 
 ## What happens at runtime
 

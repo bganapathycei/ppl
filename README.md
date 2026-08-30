@@ -36,27 +36,39 @@ Previous releases added:
 
 ## New developer? Start here
 
-1. Read [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md).
-2. Run [`examples/hello_world.ppl`](examples/hello_world.ppl).
-3. Study [`examples/incident.ppl`](examples/incident.ppl).
-4. Study [`examples/governed_change.ppl`](examples/governed_change.ppl).
-5. Study [`examples/enterprise_automation.ppl`](examples/enterprise_automation.ppl).
-6. Read [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
-7. Read [`docs/SPEC.md`](docs/SPEC.md).
-8. Study [`docs/PPL_0.9.md`](docs/PPL_0.9.md) and [`docs/PPL_0.10.md`](docs/PPL_0.10.md).
+Follow **[`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)** from Step 1. It is a numbered walkthrough (clone, virtualenv, install, first run, your own project, examples, pause/resume, troubleshooting). You do not need an API key until you choose a live provider.
+
+Condensed path:
+
+1. Clone this repo and `cd` into it.
+2. Create a venv, then `python -m pip install -e .`
+3. `ppl check examples/hello_world.ppl` then `ppl run examples/hello_world.ppl` — expect `"GREETING"`.
+4. Work through Getting Started Steps 7–12, then [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
+5. Run [`examples/incident.ppl`](examples/incident.ppl), [`governed_change.ppl`](examples/governed_change.ppl), [`enterprise_automation.ppl`](examples/enterprise_automation.ppl) in that order.
+6. Read [`docs/SPEC.md`](docs/SPEC.md) only after you have run programs.
+
+Doc index: [`docs/README.md`](docs/README.md).
 
 ## Quick start
+
+Requires Python 3.10+. From the repository root (use a virtualenv; see Getting Started Steps 3–4):
 
 ```bash
 python -m pip install -e .
 ppl check examples/hello_world.ppl
-ppl compile examples/hello_world.ppl
 ppl run examples/hello_world.ppl
-ppl run examples/incident.ppl
+```
+
+If `ppl` is not on your PATH, use `python -m ppl` instead. `ppl check` prints `PPL Compiler 0.10.0`. `ppl run` on hello world returns `"GREETING"` with the default local adapter (no API key).
+
+```bash
+ppl compile examples/hello_world.ppl
+ppl run examples/incident.ppl          # "AUTOMATE"
 ppl trace examples/incident.ppl
-ppl run examples/governed_change.ppl
-ppl run examples/enterprise_automation.ppl
+ppl run examples/governed_change.ppl   # "APPROVED"
+ppl run examples/enterprise_automation.ppl   # may WAIT for HUMAN_APPROVAL; see Getting Started Step 13
 ppl run examples/hello_world.ppl --workers 2
+ppl init my-app
 ppl fmt examples/hello_world.ppl
 ppl test
 ```
@@ -69,7 +81,9 @@ ppl approve demo APPROVE --resume --file app.ppl
 ppl resume demo --file app.ppl
 ```
 
-The bundled local cognitive adapter remains deterministic for offline development. Real model execution uses `PPL_AI_PROVIDER` (`openai`, `openrouter`, `anthropic`, `google`, `groq`, `ollama`, …). See [`docs/REAL_AI_RUNTIME.md`](docs/REAL_AI_RUNTIME.md).
+Without installing the package: `python -m ppl check examples/hello_world.ppl`.
+
+The default `local` adapter is deterministic for offline development. Live models: set `PPL_AI_PROVIDER` (`openai`, `openrouter`, `anthropic`, `google`, `groq`, `ollama`, …). See [`docs/REAL_AI_RUNTIME.md`](docs/REAL_AI_RUNTIME.md).
 
 ## Architecture
 
@@ -99,13 +113,15 @@ Parser -> AST -> Semantic Checks -> PIR
 
 ## Repository map
 
-- `docs/GETTING_STARTED.md` — beginner onboarding
-- `docs/TUTORIAL.md` — step-by-step tutorial
+- `docs/README.md` — documentation index
+- `docs/GETTING_STARTED.md` — numbered new-developer walkthrough (install through first app)
+- `docs/TUTORIAL.md` — six lessons on the bundled examples
 - `docs/EXAMPLES.md` — examples and learning path
-- `docs/SPEC.md` — canonical language specification
+- `docs/SPEC.md` — canonical language specification (draft 0.10)
 - `docs/PPL_0.9.md` — durable runtime and local workers
 - `docs/PPL_0.10.md` — multi-provider LLM adapters
 - `docs/REAL_AI_RUNTIME.md` — real model setup
+- `docs/PPL_0.5.md` … `PPL_0.8.md` — historical release notes
 - `examples/` — language and runtime examples
 - `src/ppl/` — reference implementation
 - `tests/` — executable tests
