@@ -41,6 +41,7 @@ class ModelPolicyDecl:
 class AgentDecl:
     name: str
     input_name: str | None = None
+    policy: str | None = None
     operations: list[Any] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
 
