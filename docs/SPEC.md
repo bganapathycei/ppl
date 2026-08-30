@@ -1,79 +1,107 @@
-# PPL Language Specification — Draft 0.1
+# PPL Language Specification — Draft 0.2
 
 ## 1. Purpose
 
-PPL (Prompt Programming Language) is designed to make AI-enabled behavior a first-class part of executable software. A PPL program describes intent and execution semantics without embedding a specific model provider API.
+PPL (Prompt Programming Language) makes AI-enabled behavior a first-class part of executable software. PPL source describes intent and execution semantics without embedding a specific model-provider API.
 
 ## 2. Execution classes
 
-Every operation belongs to an execution class:
-
 - **D — Deterministic:** parsing, branching, data movement, validation, and ordinary program control.
 - **C — Cognitive:** classification, extraction, reasoning, generation, or other model-backed operations.
-- **H — Human:** approval, escalation, review, or other human-in-the-loop operations planned for later releases.
+- **H — Human:** approval, escalation, review, and other human-in-the-loop operations planned for a later release.
 
 ## 3. Compilation model
 
 ```text
-Source -> AST -> Semantic Validation -> PIR -> Runtime
+Source -> AST -> Semantic Validation -> PIR -> Runtime -> AI Gateway -> Model Adapter
 ```
 
-PIR is intentionally provider-neutral. A runtime may select models, tools, policies, and execution backends without changing PPL source.
+PIR is provider-neutral. The runtime selects a model adapter and policy without changing PPL source.
 
-## 4. Core grammar concepts
+## 4. Model policy
 
-### APP
-Defines the application/program name.
+`MODEL_POLICY` defines runtime preferences independently of application logic.
 
-### INPUT
-Defines an input object and its fields.
+```text
+MODEL_POLICY EnterpriseDefault
+    reasoning: reasoning-default
+    classification: classification-default
+    extraction: extraction-default
+    max_retries: 2
+    fallback: fallback-default
+```
 
-### AGENT
-Defines a named cognitive worker with an optional input and a sequence of cognitive operations.
+An agent may bind a policy:
 
-### CLASSIFY
-Maps a value into one of a declared set of categories.
+```text
+AGENT Analyzer
+    POLICY EnterpriseDefault
+```
 
-### EXTRACT
-Requests named fields from available context.
+## 5. Typed cognitive output
 
-### REASON
-Expresses a natural-language reasoning objective. The text is semantic source code, not a direct provider prompt.
+Cognitive operations may declare an output schema. Supported 0.2 types include:
 
-### OUTPUT
-Declares the values exposed by an agent.
+- `TEXT`
+- `NUMBER`
+- `INTEGER`
+- `BOOLEAN`
+- `CONFIDENCE` — numeric value constrained to 0..1
+- `CLASSIFICATION` — text constrained to the declared classification set
 
-### WORKFLOW
-Defines deterministic orchestration.
+Example:
 
-### RECEIVE / RUN
-Receive external input and execute an agent.
+```text
+REASON
+    determine whether the incident is repetitive
+    OUTPUT:
+        repetitive: BOOLEAN
+        confidence: CONFIDENCE
+```
 
-### IF / ELSE IF / ELSE
-Deterministic control flow over resolved runtime values.
+The runtime validates model output before it enters program state.
 
-### RETURN
-Terminates the workflow with a value.
+## 6. AI gateway
 
-## 5. Design principles
+PPL does not call a model provider directly. The runtime creates an `AIRequest` and sends it through an `AIGateway` to a `ModelAdapter`.
 
-1. **Intent over provider API.** PPL source must not depend on a model vendor.
-2. **Deterministic shell, cognitive core.** Control flow remains inspectable and deterministic around model operations.
-3. **Typed cognitive output.** Future versions should make cognitive results schema-bound and validated.
-4. **Runtime governance.** Model selection, policies, budgets, safety controls, and telemetry belong in the runtime.
-5. **Observable execution.** Every cognitive operation should be traceable for latency, cost, model, confidence, and outcome.
-6. **Composable agents.** Agents should be independently testable and orchestratable.
+The adapter returns:
 
-## 6. Planned 0.2 semantics
+- structured output
+- model identifier
+- latency
+- token counts
+- estimated cost
+- attempt count
 
-- `MODEL_POLICY`
-- explicit cognitive output schemas
-- model/provider abstraction
-- structured result validation
-- confidence and uncertainty semantics
-- retry/fallback policies
-- token/cost/latency telemetry
+This creates a stable seam for future OpenAI, Anthropic, Google, local-model, or other adapters without changing the language.
 
-## 7. Non-goals for 0.1
+## 7. Retry and fallback
 
-PPL 0.1 is not a production agent platform. The local cognitive engine is deliberately a deterministic stand-in used to prove language and runtime separation.
+The policy supplies `max_retries` and a `fallback` model identifier. The reference runtime records attempt metadata. Production semantics will add failure classification and explicit retry conditions.
+
+## 8. Observability
+
+Every cognitive step should expose enough telemetry to answer:
+
+- What operation ran?
+- Which model executed it?
+- How long did it take?
+- How many tokens were consumed?
+- What did it cost?
+- How many attempts were required?
+- What confidence was returned?
+- Did schema validation succeed?
+
+## 9. Design principles
+
+1. **Intent over provider API.** PPL source remains model-provider neutral.
+2. **Deterministic shell, cognitive core.** Control flow remains inspectable around model operations.
+3. **Typed cognitive output.** AI results are validated before entering runtime state.
+4. **Policy-driven model selection.** Model choices are runtime concerns.
+5. **Observable execution.** AI behavior is traceable like ordinary program execution.
+6. **Composable agents.** Agents remain independently testable and orchestratable.
+
+## 10. Non-goals for 0.2
+
+PPL 0.2 is not yet a production model gateway. The bundled local adapter is deterministic and exists to validate language/runtime boundaries. Production credentials, provider SDKs, distributed execution, persistent memory, knowledge retrieval, tools, and human approval are later milestones.
