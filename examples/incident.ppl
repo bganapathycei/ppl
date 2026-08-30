@@ -1,0 +1,67 @@
+APP IncidentAdvisor
+
+INPUT incident
+    description: TEXT
+    application: TEXT
+    priority: TEXT
+
+AGENT Analyzer
+
+    INPUT incident
+
+    CLASSIFY incident.description AS
+        ACCESS
+        NETWORK
+        DATABASE
+        APPLICATION
+        INFRASTRUCTURE
+        OTHER
+
+    EXTRACT
+        root_cause
+        resolution
+
+    REASON
+        determine whether the incident is repetitive
+
+    OUTPUT
+        category
+        root_cause
+        resolution
+        repetitive
+        confidence
+
+AGENT AutomationAdvisor
+
+    INPUT Analyzer
+
+    REASON
+        determine whether this incident is a good candidate for automation
+
+        consider:
+            repetition
+            resolution complexity
+            human intervention
+            business risk
+
+    OUTPUT
+        score
+        rationale
+        confidence
+
+WORKFLOW Main
+
+    RECEIVE incident
+
+    RUN Analyzer
+
+    RUN AutomationAdvisor
+
+    IF AutomationAdvisor.score >= 80
+        RETURN "AUTOMATE"
+
+    ELSE IF AutomationAdvisor.score >= 50
+        RETURN "PARTIALLY_AUTOMATE"
+
+    ELSE
+        RETURN "KEEP_HUMAN"
