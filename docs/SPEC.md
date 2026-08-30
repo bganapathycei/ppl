@@ -1,5 +1,7 @@
 # PPL Language Specification — Draft 0.10
 
+Onboarding and CLI: [GETTING_STARTED.md](GETTING_STARTED.md). This document is the language contract, not a tutorial.
+
 ## 1. Purpose
 
 PPL (Prompt Programming Language) is an AI-native, intent-oriented programming language. A PPL application expresses data, deterministic control flow, cognitive operations, enterprise knowledge, memory, tools, human decisions, governance, evaluation, and graph orchestration without embedding a model-provider API in application source.

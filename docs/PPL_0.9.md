@@ -1,5 +1,7 @@
 # PPL 0.9 — Real Runtime and Local Workers
 
+> Current release is **0.10**. This note covers the durable graph runtime. Onboarding: [GETTING_STARTED.md](GETTING_STARTED.md). Providers: [PPL_0.10.md](PPL_0.10.md).
+
 PPL 0.9 turns the 0.8 graph keywords into a durable, pausable local runtime and adds a single-machine worker process pool.
 
 ## Goals
@@ -57,12 +59,14 @@ ppl worker --file app.ppl --store .ppl/executions
 
 Workers share `FileExecutionStore` and claim PENDING ready nodes. This is a **local process pool**, not remote orchestration.
 
-## Still out of scope
+## Still out of scope (for 0.9)
 
-- Anthropic / Google adapters
+Anthropic and Google adapters shipped in [PPL 0.10](PPL_0.10.md). Remaining non-goals of the 0.9 slice:
+
 - IDE / language server
 - Kubernetes, message queues, or network RPC
 - Exactly-once side effects
+- Cross-provider fallback chains
 
 ## Example
 

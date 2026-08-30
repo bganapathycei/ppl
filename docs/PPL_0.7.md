@@ -1,5 +1,7 @@
 # PPL 0.7 — Production Runtime Plan
 
+> Historical note for **0.7**. Current release is **0.10**. Durable local execution and workers: [PPL_0.9.md](PPL_0.9.md). Providers: [PPL_0.10.md](PPL_0.10.md).
+
 PPL 0.7 moves the real-AI runtime toward production execution while preserving the provider-neutral language model established in 0.6.
 
 ## Goals

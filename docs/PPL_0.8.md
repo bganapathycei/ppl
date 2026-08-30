@@ -1,5 +1,7 @@
 # PPL 0.8 — Execution Graph & Distributed Orchestration
 
+> Historical note for **0.8** (graph *specification*). Current release is **0.10**. The graph became a durable local runtime in [PPL_0.9.md](PPL_0.9.md).
+
 PPL 0.8 defines an execution-graph layer above the existing deterministic, cognitive, tool, knowledge, memory, and human primitives.
 
 ## Goals
@@ -154,4 +156,4 @@ A Receive
 - global transactional semantics
 - automatic compensation planning
 
-Those are 0.9+ concerns.
+Those are 0.9+ concerns. Local durable interpretation and a process-pool worker shipped in 0.9; a remote distributed scheduler is still out of scope.

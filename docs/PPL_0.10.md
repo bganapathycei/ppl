@@ -2,6 +2,8 @@
 
 PPL source remains provider-neutral. The runtime selects a model adapter from environment or `ppl.providers.json`. `.ppl` files never contain vendor API calls.
 
+New to PPL? Install and run hello world in [GETTING_STARTED.md](GETTING_STARTED.md). Provider setup: [REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md).
+
 ## Providers
 
 | `PPL_AI_PROVIDER` | Transport | Default base |

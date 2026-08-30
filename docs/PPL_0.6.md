@@ -1,5 +1,7 @@
 # PPL 0.6 — Real AI Runtime
 
+> Historical note for **0.6**. Current release is **0.10** with a multi-provider registry. Use [REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md) and [PPL_0.10.md](PPL_0.10.md) for live setup. Env names below (`PPL_OPENAI_*`) still work as aliases; prefer `PPL_AI_PROVIDER` / `PPL_AI_MODEL` / `OPENAI_API_KEY`.
+
 PPL 0.6 moves the language from a mock cognitive runtime toward real model-backed execution while preserving provider neutrality.
 
 ## Goals
@@ -21,7 +23,7 @@ PPL Source
    -> CognitiveRuntime
         -> AIGateway
              -> ModelAdapter
-                  -> OpenAI / Local / Future Provider
+                  -> OpenAI / Local / (0.10: Anthropic, Google, OpenRouter, …)
 ```
 
 ## Configuration

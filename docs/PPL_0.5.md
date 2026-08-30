@@ -1,5 +1,7 @@
 # PPL 0.5 — Developer Experience
 
+> Historical note for **0.5**. Current release is **0.10**. Start with [GETTING_STARTED.md](GETTING_STARTED.md). The CLI commands below still apply.
+
 PPL 0.5 makes the language easier to learn, inspect, format, test, and prototype.
 
 ## Goals
@@ -31,6 +33,7 @@ README.md
   -> docs/GETTING_STARTED.md
   -> examples/hello_world.ppl
   -> examples/incident.ppl
+  -> docs/TUTORIAL.md
   -> docs/SPEC.md
 ```
 

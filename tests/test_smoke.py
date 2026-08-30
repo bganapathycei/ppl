@@ -135,3 +135,10 @@ def test_cli_check(capsys, monkeypatch):
     out = capsys.readouterr().out
     assert "PPL Compiler 0.10.0" in out
     assert "Program is valid." in out
+
+
+def test_package_module_entrypoint():
+    from ppl.__main__ import main as module_main
+    from ppl.cli import main as cli_main
+
+    assert module_main is cli_main
