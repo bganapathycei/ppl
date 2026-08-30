@@ -1,197 +1,162 @@
-# PPL Language Specification — Draft 0.4
+# PPL Language Specification — Draft 0.8
 
 ## 1. Purpose
 
-PPL (Prompt Programming Language) is an AI-native, intent-oriented programming language. A PPL application expresses data, deterministic control flow, cognitive operations, enterprise knowledge, memory, tools, human decisions, governance, and evaluation without embedding a model-provider API in application source.
+PPL (Prompt Programming Language) is an AI-native, intent-oriented programming language. A PPL application expresses data, deterministic control flow, cognitive operations, enterprise knowledge, memory, tools, human decisions, governance, evaluation, and graph orchestration without embedding a model-provider API in application source.
 
 ## 2. Execution classes
 
-- **D — Deterministic:** parsing, branching, data movement, validation, arithmetic, state transitions, and ordinary program control.
+- **D — Deterministic:** parsing, branching, data movement, validation, arithmetic, state transitions, orchestration, and ordinary control.
 - **C — Cognitive:** classification, extraction, reasoning, planning, generation, and other model-backed operations.
 - **H — Human:** approval, review, escalation, correction, and other human-in-the-loop operations.
 
 ## 3. Compilation model
 
 ```text
-Source -> AST -> Semantic Validation -> PIR -> Runtime
-                                      |
-                                      +-> Policy / Guard evaluation
-                                      +-> AI Gateway
-                                      +-> Knowledge / Memory / Tools
-                                      +-> Human interface
+Source -> AST -> Semantic Validation -> PIR -> Execution Graph -> Runtime
 ```
 
-## 4. 0.4 governance surface
+The runtime may execute graph nodes locally or on remote workers without changing PPL source.
 
-### GUARD
+## 4. Execution graph
 
-Declares a non-negotiable runtime constraint.
+Every workflow compiles to a directed execution graph. Each node has a stable node ID, operation type, dependencies, runtime status, output, and error state.
 
 ```text
-GUARD ProductionChange
-    NEVER execute production changes
-        without authorization
+A Receive
+  |
+  +--> B RiskAnalyzer -----+
+  |                        |
+  +--> C Compliance -------+--> D Join --> E Decision
 ```
 
-A guard is a runtime policy, not a model instruction. The runtime MUST evaluate applicable guards before executing a protected action.
+The graph MUST be acyclic.
 
-### AUTHORIZATION
+## 5. Parallel execution
 
-Defines the capability scope required for an operation.
+`PARALLEL` expresses independent work that may run concurrently.
 
 ```text
-AUTHORIZATION production_change
-    REQUIRES production.write
+PARALLEL
+    RUN RiskAnalyzer
+    RUN ComplianceAnalyzer
 ```
 
-The runtime SHOULD fail closed when authorization cannot be established.
+The runtime may schedule these nodes on separate workers when available.
 
-### ENVIRONMENT
+## 6. JOIN
 
-Allows policies to distinguish development, test, staging, and production execution.
+`JOIN` represents an explicit dependency barrier. A dependent node can execute only after all joined branches succeed.
 
-```text
-ENVIRONMENT production
-    REQUIRES production.write
-```
+## 7. WAIT
 
-## 5. Human approval
+`WAIT` suspends the graph while an external event, condition, or duration is unresolved. The runtime status becomes `WAITING`.
 
-`HUMAN_APPROVAL` is a first-class execution state.
+## 8. CHECKPOINT and RESUME
 
-```text
-HUMAN_APPROVAL
-    QUESTION:
-        approve the proposed production change
-    OPTIONS:
-        APPROVE
-        REJECT
-```
-
-State model:
-
-```text
-RUNNING -> WAITING_FOR_HUMAN -> RESUMED | REJECTED | EXPIRED
-```
-
-The decision MUST be attributable to execution ID, actor, timestamp, question, options, and selected value.
-
-## 6. Evaluation surface
-
-### TEST
-
-Defines executable expectations over a representative input.
-
-```text
-TEST IncidentAdvisor
-    GIVEN incident.description = "database outage"
-    EXPECT Analyzer.category = DATABASE
-```
-
-### EVALUATION
-
-Defines dataset-level quality requirements.
-
-```text
-EVALUATION IncidentAdvisor
-    DATASET incident_test_set
-    METRIC classification_accuracy >= 0.95
-    METRIC unsupported_claim_rate <= 0.02
-```
-
-Evaluation is part of the application lifecycle and SHOULD run before production deployment.
-
-## 7. Provenance
-
-Every cognitive execution SHOULD retain:
+A checkpoint persists enough state to resume execution safely:
 
 - execution ID
-- program version
-- source/prompt version
-- model and model version
-- policy version
-- knowledge sources used
-- memory reads/writes
-- tool calls
+- graph version
+- completed nodes
+- pending nodes
+- application context
+- checkpoint ID
+- relevant runtime metadata
+
+A resumed execution MUST restore completed-node state and MUST NOT silently rerun completed non-idempotent side effects.
+
+## 9. Distributed execution
+
+The graph abstraction is infrastructure-neutral:
+
+```text
+PPL -> PIR -> Execution Graph
+                  |
+          +-------+-------+
+          |       |       |
+        Worker  Worker  Worker
+          |       |       |
+          +-------+-------+
+                  |
+             State Store
+```
+
+Workers are an implementation detail of the runtime.
+
+## 10. Node failure
+
+A graph node may fail independently. The runtime SHOULD support node-level retry and preserve failure metadata. Future releases may add compensation and transactional semantics.
+
+## 11. Runtime states
+
+Execution state includes:
+
+```text
+CREATED
+RUNNING
+WAITING
+RESUMING
+SUCCEEDED
+FAILED
+CANCELLED
+```
+
+Node state includes:
+
+```text
+PENDING
+RUNNING
+SUCCEEDED
+FAILED
+WAITING
+CHECKPOINTED
+CANCELLED
+```
+
+## 12. Governance
+
+`GUARD`, `AUTHORIZATION`, `ENVIRONMENT`, and `BUDGET` remain runtime-enforced controls. Governance applies to graph nodes as well as direct operations.
+
+## 13. Cognitive execution
+
+Cognitive nodes continue to use the provider-neutral AI request/response contract. Cognitive outputs MUST be schema-validated before entering program state. Model selection, retries, fallback, and telemetry remain runtime responsibilities.
+
+## 14. Human execution
+
+Human approval is a graph state transition:
+
+```text
+RUNNING -> WAITING -> RESUMING -> RUNNING
+```
+
+The decision is attributable to execution ID, actor, timestamp, question, options, and value.
+
+## 15. Observability
+
+Graph traces SHOULD expose:
+
+- graph version
+- node ID
+- operation
+- dependencies
+- execution worker
+- model/provider for cognitive nodes
+- latency
+- tokens
+- cost
+- retries
+- checkpoints
 - human decisions
-- validation result
-- outcome
+- final state
 
-This creates an auditable chain from source intent to observed result.
-
-## 8. Runtime budgets
-
-0.4 introduces the concept of execution budgets:
-
-```text
-BUDGET
-    max_cost: 0.10
-    max_latency: 5000ms
-    max_steps: 25
-```
-
-A runtime MUST surface a budget violation rather than silently exceeding a declared hard limit.
-
-## 9. AI debugger and trace
-
-The runtime SHOULD expose a structured trace for every step:
-
-```text
-STEP 04
-OPERATION: REASON
-TYPE: C
-MODEL: reasoning-default
-LATENCY: 1240ms
-TOKENS: 723
-COST: 0.0042
-CONFIDENCE: 0.91
-VALIDATION: PASS
-STATUS: SUCCESS
-```
-
-The trace is diagnostic data and is not itself application state.
-
-## 10. Structured cognitive output
-
-Cognitive output MUST be schema-validated before being committed to program state.
-
-Supported semantic types include:
-
-```text
-TEXT
-NUMBER
-INTEGER
-BOOLEAN
-MONEY
-PERCENT
-ID
-CONFIDENCE
-CLASSIFICATION
-```
-
-`CONFIDENCE` is normalized to `[0,1]`.
-
-## 11. Failure semantics
-
-PPL distinguishes:
-
-- `VALIDATION_ERROR` — output violates the declared schema.
-- `AUTHORIZATION_ERROR` — required capability is unavailable.
-- `GUARD_VIOLATION` — a protected operation violates policy.
-- `TOOL_ERROR` — external capability failed.
-- `MODEL_ERROR` — model execution failed.
-- `BUDGET_EXCEEDED` — a hard runtime budget was exceeded.
-- `HUMAN_REJECTED` — an explicit human decision rejected the operation.
-
-Errors SHOULD be observable and SHOULD NOT be hidden inside model-generated text.
-
-## 12. Design principles
+## 16. Design principles
 
 1. Intent over provider API.
 2. Deterministic shell around cognitive operations.
-3. Cognitive outputs are typed data, not free-form strings.
-4. Knowledge, memory, tools, and humans are first-class runtime concepts.
-5. Governance is enforced by the runtime, not delegated to prompts.
-6. Evaluation is part of programming, not an afterthought.
-7. Runtime behavior is observable and attributable.
-8. Application source remains portable across model providers.
+3. Cognitive outputs are typed data.
+4. Knowledge, memory, tools, humans, and orchestration are first-class concepts.
+5. Governance is enforced by the runtime.
+6. Evaluation is part of programming.
+7. Execution is observable and attributable.
+8. Graph orchestration is portable across local and distributed runtimes.
