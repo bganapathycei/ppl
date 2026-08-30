@@ -1,0 +1,7 @@
+{
+  "incident": {
+    "description": "Users report a repeated database connection pool failure",
+    "application": "Order Management",
+    "priority": "P2"
+  }
+}
