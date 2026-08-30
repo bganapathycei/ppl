@@ -1,31 +1,34 @@
 # PPL — Prompt Programming Language
 
-PPL is an experimental AI-native programming language for expressing deterministic computation, AI reasoning, knowledge, tools, workflows, human decisions, and governance as executable software.
+PPL is an experimental AI-native programming language for expressing deterministic computation, AI reasoning, knowledge, tools, workflows, human decisions, governance, and production runtime behavior as executable software.
 
 > **The prompt is source code. The model is not the runtime.**
 
 PPL source is parsed into an AST, compiled into a portable Prompt Intermediate Representation (PIR), and executed by a runtime that separates deterministic, cognitive, and human operations.
 
-## Current version: 0.4 draft
+## Current version: 0.7 draft
 
-PPL 0.4 extends the 0.1–0.3 foundation with the language concepts for governed execution and evaluation:
+PPL 0.7 adds the production-runtime foundation:
 
-- `GUARD` for runtime-enforced safety constraints
-- `AUTHORIZATION` for required capabilities
-- `ENVIRONMENT` for execution context
-- `BUDGET` for cost, latency, and step limits
-- `TEST` and `EVALUATION` for AI quality validation
-- structured execution provenance and diagnostics
-- `KNOWLEDGE`, `MEMORY`, `TOOL`, and `HUMAN_APPROVAL` from 0.3
+- asynchronous cognitive execution
+- streaming event contracts
+- typed provider/runtime error classification
+- bounded retry and backoff semantics
+- rate-limit-aware execution primitives
+- durable execution state abstraction
+- resumable execution IDs
+- model pricing abstraction
+- environment/secret separation
 
 ## New developer? Start here
 
 1. Read [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md).
 2. Run [`examples/hello_world.ppl`](examples/hello_world.ppl).
-3. Study [`examples/incident.ppl`](examples/incident.ppl) for multi-agent execution.
-4. Study [`examples/governed_change.ppl`](examples/governed_change.ppl) for 0.4 governance.
-5. Read [`docs/EXAMPLES.md`](docs/EXAMPLES.md) for the learning path.
-6. Read [`docs/SPEC.md`](docs/SPEC.md) for language semantics.
+3. Study [`examples/incident.ppl`](examples/incident.ppl).
+4. Study [`examples/governed_change.ppl`](examples/governed_change.ppl).
+5. Read [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
+6. Read [`docs/PPL_0.7.md`](docs/PPL_0.7.md).
+7. Read [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Quick start
 
@@ -37,7 +40,7 @@ ppl run examples/incident.ppl
 ppl trace examples/incident.ppl
 ```
 
-The bundled cognitive engine is a deterministic local stub. It is intentionally provider-neutral so language development does not depend on one model vendor.
+For real-model execution, configure the provider through environment variables. Never put API keys in `.ppl` source.
 
 ## Architecture
 
@@ -50,15 +53,17 @@ Lexer -> Parser -> AST -> Semantic Checks -> PIR
                                       v
                                PPL Runtime
                                       |
-                 +--------------------+--------------------+
-                 |                    |                    |
-            Deterministic         Cognitive             Human
-                 |                    |                    |
-              Rules/IF         AI Gateway/Models     Approval/Review
-                 |                    |                    |
-                 +--------------------+--------------------+
+                  +-------------------+-------------------+
+                  |                   |                   |
+             Deterministic        Cognitive            Human
+                  |                   |                   |
+               Rules/IF        AI Gateway/Models     Approval/Review
+                  |                   |                   |
+                  +-------------------+-------------------+
                                       |
-                          Knowledge / Memory / Tools
+                         Knowledge / Memory / Tools
+                                      |
+                           Execution State / Trace
                                       |
                                   Enterprise
 ```
@@ -70,6 +75,9 @@ Lexer -> Parser -> AST -> Semantic Checks -> PIR
 0.2  Model abstraction + typed cognitive output
 0.3  Knowledge + memory + tools + human decisions
 0.4  Governance + evaluation + provenance + budgets
+0.5  Developer experience
+0.6  Real AI runtime + provider abstraction
+0.7  Production runtime primitives
 1.0  Production compiler/runtime + deployment
 ```
 
@@ -78,19 +86,22 @@ Lexer -> Parser -> AST -> Semantic Checks -> PIR
 1. **Intent over provider API.** Application source should not be tied to an AI vendor.
 2. **Deterministic shell around cognitive operations.** Control flow remains inspectable.
 3. **Typed cognitive output.** AI responses become validated program data.
-4. **Governance is executable.** Guards and authorization are runtime controls, not suggestions to a model.
-5. **Evaluation is programming.** AI behavior must be tested against representative data.
+4. **Governance is executable.** Guards and authorization are runtime controls.
+5. **Evaluation is programming.** AI behavior is tested against representative data.
 6. **Everything important is observable.** Model, policy, provenance, cost, latency, validation, tools, and human decisions should be traceable.
+7. **Production concerns stay in the runtime.** Retry, backoff, streaming, persistence, rate limits, and provider failure mapping do not leak into PPL application syntax.
 
 ## Repository map
 
 - `docs/GETTING_STARTED.md` — beginner onboarding
+- `docs/TUTORIAL.md` — step-by-step language tutorial
 - `docs/EXAMPLES.md` — examples and learning path
 - `docs/SPEC.md` — language specification
+- `docs/PPL_0.7.md` — production runtime design
 - `examples/` — runnable language examples
 - `src/ppl/` — reference implementation
 - `tests/` — executable tests
 
 ## Status
 
-PPL is experimental. The 0.x releases are intended to explore language semantics and runtime architecture. Syntax and runtime contracts may change before 1.0.
+PPL is experimental. The 0.x releases explore language semantics and runtime architecture. Syntax and runtime contracts may change before 1.0.
