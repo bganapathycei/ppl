@@ -6,7 +6,7 @@ Current language and runtime: **0.10.0**.
 
 1. **[GETTING_STARTED.md](GETTING_STARTED.md)** — numbered setup (clone, venv, install), first run, your own project, examples, pause/resume, troubleshooting.
 2. **[TUTORIAL.md](TUTORIAL.md)** — six lessons on the bundled `.ppl` files. Requires Getting Started Steps 1–6.
-3. **[EXAMPLES.md](EXAMPLES.md)** — example index and ideas for a first application.
+3. **[EXAMPLES.md](EXAMPLES.md)** — each sample with **command → input → output** and what the graph did.
 4. **[REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md)** — live model providers (optional; no API key needed before this).
 5. **[SPEC.md](SPEC.md)** — language specification (draft 0.10). Read this after you have run programs, not before.
 

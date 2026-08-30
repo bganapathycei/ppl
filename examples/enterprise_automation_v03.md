@@ -1,6 +1,6 @@
 # PPL 0.3 Enterprise Automation Example
 
-> Historical snapshot of the 0.3 program text. The runnable source is [`enterprise_automation.ppl`](enterprise_automation.ppl). Onboarding: [`docs/GETTING_STARTED.md`](../docs/GETTING_STARTED.md).
+> Historical snapshot of the 0.3 program text. The runnable source is [`enterprise_automation.ppl`](enterprise_automation.ppl). Command → input → output: [`docs/EXAMPLES.md`](../docs/EXAMPLES.md) §4. Onboarding: [`docs/GETTING_STARTED.md`](../docs/GETTING_STARTED.md).
 
 ```text
 APP IncidentAutomation

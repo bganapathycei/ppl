@@ -86,10 +86,16 @@ IF AutomationAdvisor.score >= 80
 
 ```bash
 ppl run examples/incident.ppl
+```
+
+**Input (CLI default):** repeated database connection pool failure (`INC-1001`).  
+**Output:** `"AUTOMATE"`.
+
+```bash
 ppl trace examples/incident.ppl
 ```
 
-**Expected:** `"AUTOMATE"`. The trace lists graph nodes and cognitive steps (`CLASSIFY`, `EXTRACT`, `REASON`) marked `[C]`.
+The trace lists graph nodes and cognitive steps (`CLASSIFY`, `EXTRACT`, `REASON`) marked `[C]`.
 
 ### 2. Try this
 
@@ -101,9 +107,15 @@ ppl run examples/incident.ppl --input examples/incident.json
 
 Still `"AUTOMATE"` locally: the description includes “database connection pool” and “repeated”.
 
-Open `examples/incident.json`, change `description` to something with no database/repeat keywords (for example `"One-off laptop screen flicker"`), save, and run again. Locally you should get `"KEEP_HUMAN"` or `"PARTIALLY_AUTOMATE"` because the automation score drops.
+Save `keep-human.json` with `"description": "One-off laptop screen flicker"` (and any `application` / `priority`), then:
 
-**Tip:** When an `IF` surprises you, `ppl trace` is faster than guessing. Look for `REASON` output and the `IF` condition in the trace.
+```bash
+ppl run examples/incident.ppl --input keep-human.json
+```
+
+**Output:** `"KEEP_HUMAN"` (local automation score drops to ~42).
+
+**Tip:** When an `IF` surprises you, `ppl trace` is faster than guessing. Full I/O catalog: [EXAMPLES.md](EXAMPLES.md).
 
 ### What this lesson taught
 
@@ -183,40 +195,52 @@ CALL ServiceManagement.create_ticket
     title = "Automation candidate"
 ```
 
-### 1. Run with an auto-approval (simplest)
+### 1. Run the default sample (no pause)
 
-**bash**
+```bash
+ppl run examples/enterprise_automation.ppl
+```
+
+**Input (CLI default):** same repeated DB-pool incident as `incident.ppl`.  
+**Output:** `"DATABASE"`.  
+**Side effect:** a line in `.ppl/tickets.jsonl`. Human approval is **SKIPPED** (local confidence ≥ 0.85).
+
+```bash
+ppl trace examples/enterprise_automation.ppl
+```
+
+You should see `IF … else`, `CALL … create_ticket`, `RETURN … DATABASE`.
+
+### 2. Force the human gate
+
+Save `needs-approval.json` with a vague description (e.g. `"Odd intermittent glitch"`). Then either:
+
+**bash — auto-approve**
 
 ```bash
 export PPL_HUMAN_DECISION=APPROVE
-ppl run examples/enterprise_automation.ppl
+ppl run examples/enterprise_automation.ppl --input needs-approval.json
 ```
 
 **PowerShell**
 
 ```powershell
 $env:PPL_HUMAN_DECISION = "APPROVE"
-ppl run examples/enterprise_automation.ppl
+ppl run examples/enterprise_automation.ppl --input needs-approval.json
 ```
 
-**Expected:** a category string such as `"ACCESS"` or `"DATABASE"`, and a new line in `.ppl/tickets.jsonl`.
-
-The local analyzer often returns `confidence` **0.72**, which is below `0.85`, so without `PPL_HUMAN_DECISION` (or a TTY prompt) the run waits.
-
-### 2. Run the pause/resume path
-
-Unset the env var, then:
+**Or pause / resume**
 
 ```bash
-ppl run examples/enterprise_automation.ppl --execution-id ticket-1
+ppl run examples/enterprise_automation.ppl --input needs-approval.json --execution-id ticket-1
 ppl approve ticket-1 APPROVE --resume --file examples/enterprise_automation.ppl
 ```
 
-If you are at an interactive `Decision>` prompt, type `APPROVE`.
+If you are at an interactive `Decision>` prompt, type `APPROVE`. Exit status **2** means `WAITING`, not a crash.
 
-`SOURCE` names map to files. `create_ticket` is a fail-closed builtin (writes `.ppl/tickets.jsonl` unless remapped in `ppl.tools.json`).
+`SOURCE` names map to files under `examples/knowledge/`. `create_ticket` is a fail-closed builtin.
 
-**Tip:** Delete `.ppl/` if you want a clean memory/ticket/execution slate. That directory is gitignored.
+**Tip:** Delete `.ppl/` for a clean memory/ticket/execution slate. Transcripts: [EXAMPLES.md](EXAMPLES.md) §4.
 
 ### What this lesson taught
 

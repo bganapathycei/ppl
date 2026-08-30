@@ -44,7 +44,7 @@ Condensed path:
 2. Create a venv, then `python -m pip install -e .`
 3. `ppl check examples/hello_world.ppl` then `ppl run examples/hello_world.ppl` — expect `"GREETING"`.
 4. Work through Getting Started Steps 7–12, then [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
-5. Run [`examples/incident.ppl`](examples/incident.ppl), [`governed_change.ppl`](examples/governed_change.ppl), [`enterprise_automation.ppl`](examples/enterprise_automation.ppl) in that order.
+5. Follow [`docs/EXAMPLES.md`](docs/EXAMPLES.md) for each sample’s **command → input → output** (`incident` → `"AUTOMATE"`, `governed_change` → `"APPROVED"`, `enterprise_automation` → `"DATABASE"`).
 6. Read [`docs/SPEC.md`](docs/SPEC.md) only after you have run programs.
 
 Doc index: [`docs/README.md`](docs/README.md).
@@ -59,19 +59,21 @@ ppl check examples/hello_world.ppl
 ppl run examples/hello_world.ppl
 ```
 
-If `ppl` is not on your PATH, use `python -m ppl` instead. `ppl check` prints `PPL Compiler 0.10.0`. `ppl run` on hello world returns `"GREETING"` with the default local adapter (no API key).
+If `ppl` is not on your PATH, use `python -m ppl` instead. `ppl check` prints `PPL Compiler 0.10.0`. `ppl run` on hello world returns `"GREETING"` with the default local adapter (no API key). Expected I/O for every bundled example: [`docs/EXAMPLES.md`](docs/EXAMPLES.md).
 
 ```bash
 ppl compile examples/hello_world.ppl
-ppl run examples/incident.ppl          # "AUTOMATE"
+ppl run examples/incident.ppl                  # "AUTOMATE"
 ppl trace examples/incident.ppl
-ppl run examples/governed_change.ppl   # "APPROVED"
-ppl run examples/enterprise_automation.ppl   # may WAIT for HUMAN_APPROVAL; see Getting Started Step 13
+ppl run examples/governed_change.ppl           # "APPROVED"
+ppl run examples/enterprise_automation.ppl    # "DATABASE" (+ .ppl/tickets.jsonl)
 ppl run examples/hello_world.ppl --workers 2
 ppl init my-app
 ppl fmt examples/hello_world.ppl
 ppl test
 ```
+
+Full command → input → output for each sample: [`docs/EXAMPLES.md`](docs/EXAMPLES.md). Pause/resume practice uses a low-confidence payload (Getting Started Step 13).
 
 Pause / resume:
 
@@ -116,7 +118,7 @@ Parser -> AST -> Semantic Checks -> PIR
 - `docs/README.md` — documentation index
 - `docs/GETTING_STARTED.md` — numbered new-developer walkthrough (install through first app)
 - `docs/TUTORIAL.md` — six lessons on the bundled examples
-- `docs/EXAMPLES.md` — examples and learning path
+- `docs/EXAMPLES.md` — examples with command-line inputs and outputs
 - `docs/SPEC.md` — canonical language specification (draft 0.10)
 - `docs/PPL_0.9.md` — durable runtime and local workers
 - `docs/PPL_0.10.md` — multi-provider LLM adapters

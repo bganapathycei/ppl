@@ -430,38 +430,53 @@ Start with **recommendations**, not autonomous production actions.
 
 ## Step 12 — Run the bundled examples (in this order)
 
-All of these work offline with the local adapter. Stay in the repo root.
+All of these work offline with the local adapter. Stay in the repo root. Full transcripts (command → input → output → graph): [EXAMPLES.md](EXAMPLES.md).
 
-| Order | Command | Local result | What you are learning |
+| Order | Command | Local output | What you are learning |
 |---|---|---|---|
 | 1 | `ppl run examples/hello_world.ppl` | `"GREETING"` | APP, INPUT, CLASSIFY, WORKFLOW |
 | 2 | `ppl run examples/incident.ppl` | `"AUTOMATE"` | Two agents, `MODEL_POLICY`, `IF` on a score |
-| 3 | `ppl run examples/governed_change.ppl` | `"APPROVED"` | `GUARD`, `AUTHORIZATION`, `BUDGET`, confidence gate |
-| 4 | `ppl run examples/enterprise_automation.ppl` | pause or a category | Knowledge, memory, `CALL create_ticket`, human approval |
+| 3 | `ppl run examples/governed_change.ppl` | `"APPROVED"` | `GUARD`, `AUTHORIZATION`, `BUDGET` |
+| 4 | `ppl run examples/enterprise_automation.ppl` | `"DATABASE"` | Knowledge, memory, `CALL create_ticket` |
 
-Incident with a custom payload (the file is already in the repo):
+### Incident — default vs custom input
 
 ```bash
+ppl run examples/incident.ppl
+# -> "AUTOMATE"
+# CLI input: repeated database connection pool failure
+
 ppl run examples/incident.ppl --input examples/incident.json
+# -> "AUTOMATE"
 ```
 
-Still `"AUTOMATE"` locally: the sample text contains “database connection pool” and “repeated”, so the local adapter scores it as automatable.
+To see another branch, use a one-off description (no “repeated” / database keywords):
 
-**Incident** (`examples/incident.ppl`) — workflow shape:
-
-```text
-RECEIVE incident
-RUN Analyzer
-RUN AutomationAdvisor
-IF AutomationAdvisor.score >= 80
-    RETURN "AUTOMATE"
+```bash
+ppl run examples/incident.ppl --input keep-human.json
+# -> "KEEP_HUMAN"   (local automation score ~42)
 ```
 
-**Governed change** — guards and budgets are runtime controls, not prompt text. The local adapter typically returns high confidence (`0.92`), so this example completes with `"APPROVED"` and does **not** pause.
+### Governed change
 
-**Enterprise automation** — the local analyzer often returns `confidence` **0.72**, which is below `0.85`, so the workflow hits `HUMAN_APPROVAL`. That is expected. Continue with Step 13.
+```bash
+ppl run examples/governed_change.ppl
+# -> "APPROVED"
+```
 
-Work through the same files as lessons in [TUTORIAL.md](TUTORIAL.md). Catalog and ideas: [EXAMPLES.md](EXAMPLES.md).
+Local `confidence` is **0.92**, so `HUMAN_APPROVAL` is skipped. Guards/budgets are runtime controls, not prompt text.
+
+### Enterprise automation
+
+```bash
+ppl run examples/enterprise_automation.ppl
+# -> "DATABASE"
+# also appends a line to .ppl/tickets.jsonl
+```
+
+Default sample input matches the incident (repeated DB pool). Local confidence is high enough that the human gate is **SKIPPED**. To practice pause/approve, use Step 13.
+
+Work through the same files as lessons in [TUTORIAL.md](TUTORIAL.md).
 
 ---
 
@@ -469,10 +484,23 @@ Work through the same files as lessons in [TUTORIAL.md](TUTORIAL.md). Catalog an
 
 Human approval and `WAIT` persist under `.ppl/executions/` (override with `PPL_STATE_DIR` or `--store`).
 
-Give the run a stable id so you can approve it:
+The **default** enterprise sample does **not** pause (local confidence ≥ 0.85). Use a low-signal payload to exercise the gate. Save as `needs-approval.json`:
+
+```json
+{
+  "incident": {
+    "description": "Odd intermittent glitch",
+    "application": "Portal",
+    "priority": "P3",
+    "id": "INC-77"
+  }
+}
+```
+
+Give the run a stable id:
 
 ```bash
-ppl run examples/enterprise_automation.ppl --execution-id demo
+ppl run examples/enterprise_automation.ppl --input needs-approval.json --execution-id demo
 ```
 
 If the process is a TTY, you get an interactive prompt:
@@ -507,17 +535,17 @@ For CI / scripts, skip the prompt:
 
 ```bash
 export PPL_HUMAN_DECISION=APPROVE
-ppl run examples/enterprise_automation.ppl
+ppl run examples/enterprise_automation.ppl --input needs-approval.json
 ```
 
 **PowerShell**
 
 ```powershell
 $env:PPL_HUMAN_DECISION = "APPROVE"
-ppl run examples/enterprise_automation.ppl
+ppl run examples/enterprise_automation.ppl --input needs-approval.json
 ```
 
-A successful enterprise run returns a category such as `"ACCESS"` or `"DATABASE"` and appends a ticket line to `.ppl/tickets.jsonl`.
+A successful enterprise run returns a category (often `"ACCESS"` or `"DATABASE"`) and appends a ticket line to `.ppl/tickets.jsonl`.
 
 **Tip:** Always pass `--file` on `resume` / `approve --resume` if the stored execution has no program path, or if you moved the `.ppl` file.
 
@@ -527,7 +555,7 @@ Optional local workers (same machine, shared file store — not a cluster):
 ppl run examples/hello_world.ppl --workers 2
 ```
 
-Details: [PPL_0.9.md](PPL_0.9.md).
+Details: [PPL_0.9.md](PPL_0.9.md). Full I/O catalog: [EXAMPLES.md](EXAMPLES.md).
 
 ---
 

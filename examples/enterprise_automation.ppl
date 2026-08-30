@@ -7,6 +7,12 @@ MODEL_POLICY EnterpriseDefault
     max_retries: 2
     fallback: fallback-default
 
+INPUT incident
+    description: TEXT
+    application: TEXT
+    priority: TEXT
+    id: TEXT
+
 KNOWLEDGE ITOperations
     SOURCE runbooks
     SOURCE application_catalog
