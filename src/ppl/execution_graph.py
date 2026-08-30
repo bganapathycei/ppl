@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 import asyncio
 import time
 import uuid
@@ -16,6 +16,7 @@ class NodeStatus(str, Enum):
     WAITING = "WAITING"
     CHECKPOINTED = "CHECKPOINTED"
     CANCELLED = "CANCELLED"
+    SKIPPED = "SKIPPED"
 
 
 class ExecutionStatus(str, Enum):
@@ -26,6 +27,14 @@ class ExecutionStatus(str, Enum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+
+
+class PauseExecution(Exception):
+    """Signal that the graph should stop in WAITING until resumed."""
+
+    def __init__(self, wait: dict[str, Any]):
+        super().__init__(wait.get("reason", "waiting"))
+        self.wait = wait
 
 
 @dataclass
@@ -57,28 +66,59 @@ class Execution:
     context: dict[str, Any] = field(default_factory=dict)
     checkpoints: dict[str, ExecutionCheckpoint] = field(default_factory=dict)
     current_checkpoint_id: str | None = None
+    program_path: str | None = None
+    graph_version: str = "0.9"
+    result: Any = None
+    wait: dict[str, Any] | None = None
+    events: list[dict[str, Any]] = field(default_factory=list)
 
     def ready_nodes(self) -> list[GraphNode]:
         ready = []
         for node in self.nodes.values():
             if node.status is not NodeStatus.PENDING:
                 continue
-            if all(self.nodes[d].status is NodeStatus.SUCCEEDED for d in node.dependencies):
+            if self._branch_skipped(node):
+                node.status = NodeStatus.SKIPPED
+                continue
+            if all(
+                self.nodes[d].status in {NodeStatus.SUCCEEDED, NodeStatus.SKIPPED, NodeStatus.CHECKPOINTED}
+                for d in node.dependencies
+            ):
                 ready.append(node)
         return ready
+
+    def _branch_skipped(self, node: GraphNode) -> bool:
+        gate = node.metadata.get("gate")
+        branch = node.metadata.get("branch")
+        if not gate or not branch:
+            return False
+        gates = self.context.get("_gates") or {}
+        taken = gates.get(gate)
+        return taken is not None and taken != branch
 
     def checkpoint(self, name: str) -> ExecutionCheckpoint:
         cp = ExecutionCheckpoint(
             checkpoint_id=name,
             execution_id=self.execution_id,
-            completed_nodes=[n.node_id for n in self.nodes.values() if n.status is NodeStatus.SUCCEEDED],
+            completed_nodes=[
+                n.node_id
+                for n in self.nodes.values()
+                if n.status in {NodeStatus.SUCCEEDED, NodeStatus.SKIPPED, NodeStatus.CHECKPOINTED}
+            ],
             pending_nodes=[n.node_id for n in self.nodes.values() if n.status is NodeStatus.PENDING],
             context=dict(self.context),
         )
         self.checkpoints[name] = cp
         self.current_checkpoint_id = name
-        self.status = ExecutionStatus.WAITING
         return cp
+
+    def resume_from_wait(self) -> None:
+        """Clear wait state and re-queue WAITING nodes as PENDING."""
+        self.wait = None
+        for node in self.nodes.values():
+            if node.status is NodeStatus.WAITING:
+                node.status = NodeStatus.PENDING
+        self.status = ExecutionStatus.RESUMING
 
     def resume(self, checkpoint_id: str | None = None) -> None:
         checkpoint_id = checkpoint_id or self.current_checkpoint_id
@@ -88,9 +128,11 @@ class Execution:
         self.context = dict(cp.context)
         for node in self.nodes.values():
             if node.node_id in cp.completed_nodes:
-                node.status = NodeStatus.SUCCEEDED
-            else:
+                if node.status not in {NodeStatus.SUCCEEDED, NodeStatus.SKIPPED, NodeStatus.CHECKPOINTED}:
+                    node.status = NodeStatus.SUCCEEDED
+            elif node.status is not NodeStatus.SKIPPED:
                 node.status = NodeStatus.PENDING
+        self.wait = None
         self.status = ExecutionStatus.RESUMING
 
 
@@ -128,6 +170,8 @@ class ExecutionGraph:
 
 
 class InMemoryExecutionStore:
+    """Legacy alias used by examples/tests; prefer store.InMemoryGraphStore."""
+
     def __init__(self) -> None:
         self.executions: dict[str, Execution] = {}
 
@@ -140,11 +184,17 @@ class InMemoryExecutionStore:
         return self.executions[execution_id]
 
 
-class GraphExecutor:
-    """Small async executor for graph scheduling, checkpointing and resume."""
+class GraphStoreProtocol(Protocol):
+    def save(self, execution: Execution) -> None: ...
+    def load(self, execution_id: str) -> Execution: ...
 
-    def __init__(self, store: InMemoryExecutionStore | None = None):
+
+class GraphExecutor:
+    """Async executor for graph scheduling, pause/wait, checkpoint and resume."""
+
+    def __init__(self, store: GraphStoreProtocol | None = None, worker_id: str | None = None):
         self.store = store or InMemoryExecutionStore()
+        self.worker_id = worker_id
 
     async def run(
         self,
@@ -154,8 +204,21 @@ class GraphExecutor:
         execution.status = ExecutionStatus.RUNNING
         self.store.save(execution)
         while True:
-            if all(node.status is NodeStatus.SUCCEEDED for node in execution.nodes.values()):
+            terminal = {NodeStatus.SUCCEEDED, NodeStatus.SKIPPED, NodeStatus.CHECKPOINTED, NodeStatus.CANCELLED}
+            if all(node.status in terminal for node in execution.nodes.values()):
                 execution.status = ExecutionStatus.SUCCEEDED
+                execution.wait = None
+                self.store.save(execution)
+                return execution
+
+            if execution.result is not None and not any(
+                n.status is NodeStatus.PENDING for n in execution.nodes.values()
+            ):
+                for node in execution.nodes.values():
+                    if node.status is NodeStatus.PENDING:
+                        node.status = NodeStatus.CANCELLED
+                execution.status = ExecutionStatus.SUCCEEDED
+                execution.wait = None
                 self.store.save(execution)
                 return execution
 
@@ -165,25 +228,77 @@ class GraphExecutor:
                     execution.status = ExecutionStatus.FAILED
                     self.store.save(execution)
                     return execution
+                if any(node.status is NodeStatus.WAITING for node in execution.nodes.values()):
+                    execution.status = ExecutionStatus.WAITING
+                    self.store.save(execution)
+                    return execution
+                # Mark remaining unreachable pending as skipped after branch cancel
+                pending = [n for n in execution.nodes.values() if n.status is NodeStatus.PENDING]
+                if pending:
+                    for n in pending:
+                        if execution._branch_skipped(n):
+                            n.status = NodeStatus.SKIPPED
+                    continue
                 execution.status = ExecutionStatus.WAITING
                 self.store.save(execution)
                 return execution
 
-            await asyncio.gather(*(self._execute_node(node, execution, handlers) for node in ready))
+            try:
+                await asyncio.gather(*(self._execute_node(node, execution, handlers) for node in ready))
+            except PauseExecution as pause:
+                execution.wait = pause.wait
+                execution.status = ExecutionStatus.WAITING
+                self.store.save(execution)
+                return execution
             self.store.save(execution)
+            if execution.result is not None:
+                for node in execution.nodes.values():
+                    if node.status is NodeStatus.PENDING:
+                        node.status = NodeStatus.CANCELLED
+                execution.status = ExecutionStatus.SUCCEEDED
+                self.store.save(execution)
+                return execution
 
     async def _execute_node(self, node: GraphNode, execution: Execution, handlers: dict[str, Callable]) -> None:
+        if execution._branch_skipped(node):
+            node.status = NodeStatus.SKIPPED
+            return
         node.status = NodeStatus.RUNNING
+        if self.worker_id:
+            node.metadata["worker"] = self.worker_id
         try:
-            result = handlers[node.operation](node, execution)
+            handler = handlers.get(node.operation) or handlers.get("*")
+            if handler is None:
+                raise KeyError(f"No handler for operation {node.operation}")
+            # Run sync handlers in a worker thread so PARALLEL branches overlap.
+            result = await asyncio.to_thread(handler, node, execution)
             if asyncio.iscoroutine(result):
                 result = await result
+            if node.status is NodeStatus.WAITING:
+                raise PauseExecution(execution.wait or {"reason": node.operation, "node_id": node.node_id})
             node.output = result
-            node.status = NodeStatus.SUCCEEDED
+            if node.status is not NodeStatus.CHECKPOINTED:
+                node.status = NodeStatus.SUCCEEDED
             execution.context[node.node_id] = result
+            execution.events.append({
+                "type": "NODE_COMPLETE",
+                "node_id": node.node_id,
+                "operation": node.operation,
+                "worker": node.metadata.get("worker"),
+                "ts": time.time(),
+            })
+        except PauseExecution:
+            node.status = NodeStatus.WAITING
+            raise
         except Exception as exc:  # noqa: BLE001
             node.error = str(exc)
             node.status = NodeStatus.FAILED
+            execution.events.append({
+                "type": "NODE_FAILED",
+                "node_id": node.node_id,
+                "error": str(exc),
+                "ts": time.time(),
+            })
 
     def checkpoint(self, execution_id: str, name: str) -> ExecutionCheckpoint:
         execution = self.store.load(execution_id)
@@ -191,8 +306,16 @@ class GraphExecutor:
         self.store.save(execution)
         return cp
 
-    async def resume(self, execution_id: str, handlers: dict[str, Callable], checkpoint_id: str | None = None) -> Execution:
+    async def resume(
+        self,
+        execution_id: str,
+        handlers: dict[str, Callable],
+        checkpoint_id: str | None = None,
+    ) -> Execution:
         execution = self.store.load(execution_id)
-        execution.resume(checkpoint_id)
+        if checkpoint_id:
+            execution.resume(checkpoint_id)
+        else:
+            execution.resume_from_wait()
         self.store.save(execution)
         return await self.run(execution, handlers)

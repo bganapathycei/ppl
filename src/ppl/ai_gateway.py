@@ -79,6 +79,14 @@ class LocalModelAdapter:
                 }
             else:
                 output = {"result": "REASONED", "confidence": 0.70}
+            if "evidence" in request.schema and "evidence" not in output:
+                knowledge = []
+                if isinstance(request.input_data, dict):
+                    knowledge = request.input_data.get("knowledge") or []
+                if knowledge:
+                    output["evidence"] = str(knowledge[0].get("text", knowledge[0]))[:240]
+                else:
+                    output["evidence"] = "No external knowledge retrieved."
         for field, typ in request.schema.items():
             if field in output:
                 continue

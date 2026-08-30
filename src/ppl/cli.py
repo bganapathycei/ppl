@@ -7,9 +7,11 @@ from . import __version__
 from .ai_gateway import AIGateway
 from .compiler import Compiler
 from .dx import diagnostics_from_exception, format_ppl, init_project
+from .execution_graph import ExecutionStatus
 from .parser import parse
 from .provider import build_adapter
-from .runtime import Runtime
+from .runtime import Runtime, approve_execution
+from .store import FileExecutionStore, default_state_dir
 from .test_runner import discover_tests, run_test_module
 
 
@@ -32,10 +34,11 @@ def default_input(pir):
                 "description": "Repeated database connection pool failure",
                 "application": "Order Management",
                 "priority": "P2",
+                "id": "INC-1001",
             }
         }
     if "request" in names:
-        return {"request": {"text": "hello there"}}
+        return {"request": {"text": "hello there", "done": True}}
     if "change" in names:
         return {
             "change": {
@@ -60,12 +63,23 @@ def compile_file(path):
 
 def print_trace(pir, runtime, result):
     print(f"Application: {pir['application']}\n")
+    execution = runtime.execution
+    if execution is not None:
+        print(f"Execution: {execution.execution_id}")
+        print(f"Status: {execution.status.value}")
+        if execution.wait:
+            print(f"Wait: {json.dumps(execution.wait)}")
+        print()
     graph = pir.get("graph", {}).get("nodes") or []
     if graph:
         print("Execution graph")
+        node_state = execution.nodes if execution else {}
         for node in graph:
             deps = ",".join(node["dependencies"]) or "-"
-            print(f"  {node['id']:22} {node['operation']:16} deps={deps}")
+            live = node_state.get(node["id"])
+            status = live.status.value if live else "-"
+            worker = (live.metadata.get("worker") if live else None) or "-"
+            print(f"  {node['id']:22} {node['operation']:16} status={status:10} worker={worker} deps={deps}")
         print()
     print("Execution trace")
     for step, typ, detail in runtime.trace:
@@ -135,14 +149,133 @@ def cmd_repl(_args):
         buffer.append(line)
 
 
+def _store_from_args(args):
+    root = getattr(args, "store", None) or default_state_dir()
+    return FileExecutionStore(root)
+
+
+def cmd_run_program(args, pir, *, trace: bool = False):
+    input_data = json.loads(load(args.input)) if getattr(args, "input", None) else default_input(pir)
+    store = _store_from_args(args)
+    workers = int(getattr(args, "workers", 0) or 0)
+    execution_id = getattr(args, "execution_id", None)
+
+    if workers > 0:
+        from .workers import run_with_workers
+        result = run_with_workers(
+            args.file,
+            pir,
+            input_data,
+            workers=workers,
+            store=store,
+            execution_id=execution_id,
+        )
+        runtime = Runtime(pir, gateway=build_gateway(), store=store, program_path=args.file)
+        if isinstance(result, dict) and result.get("status") == "WAITING":
+            runtime.execution = store.load(result["execution_id"])
+        elif execution_id and store.exists(execution_id):
+            runtime.execution = store.load(execution_id)
+        elif store.list_ids():
+            # best-effort: last written id from result
+            eid = result.get("execution_id") if isinstance(result, dict) else None
+            if eid and store.exists(eid):
+                runtime.execution = store.load(eid)
+        if trace:
+            print_trace(pir, runtime, result)
+        else:
+            print(json.dumps(result, indent=2))
+        if isinstance(result, dict) and result.get("status") == "WAITING":
+            raise SystemExit(2)
+        return
+
+    runtime = Runtime(pir, gateway=build_gateway(), store=store, program_path=args.file)
+    result = runtime.run(input_data, execution_id=execution_id)
+    if trace:
+        print_trace(pir, runtime, result)
+    else:
+        print(json.dumps(result, indent=2))
+    if isinstance(result, dict) and result.get("status") == "WAITING":
+        raise SystemExit(2)
+
+
+def cmd_resume(args):
+    store = _store_from_args(args)
+    execution = store.load(args.execution_id)
+    program_path = args.file or execution.program_path
+    if not program_path:
+        raise SystemExit("Execution has no program_path; pass the .ppl file as --file")
+    pir = compile_file(program_path)
+    runtime = Runtime(pir, gateway=build_gateway(), store=store, program_path=program_path)
+    result = runtime.run(execution_id=args.execution_id, resume=True)
+    print(json.dumps(result, indent=2))
+    if isinstance(result, dict) and result.get("status") == "WAITING":
+        raise SystemExit(2)
+
+
+def cmd_approve(args):
+    store = _store_from_args(args)
+    approve_execution(store, args.execution_id, args.decision)
+    if args.resume:
+        class NS:
+            pass
+        ns = NS()
+        ns.execution_id = args.execution_id
+        ns.file = args.file
+        ns.store = args.store
+        cmd_resume(ns)
+    else:
+        print(json.dumps({"execution_id": args.execution_id, "decision": args.decision, "status": "approved"}, indent=2))
+
+
+def cmd_worker(args):
+    from .workers import _worker_loop
+    import threading
+
+    stop = threading.Event()
+    program = args.file
+    if not program:
+        raise SystemExit("ppl worker requires --file pointing at the .ppl program")
+    print(f"Worker listening on {args.store or default_state_dir()} for {program}")
+    try:
+        _worker_loop(str(args.store or default_state_dir()), program, args.name or "worker-cli", stop)
+    except KeyboardInterrupt:
+        stop.set()
+        print("Worker stopped.")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="ppl")
     sub = parser.add_subparsers(dest="command", required=True)
-    for cmd in ("check", "compile", "run", "trace"):
+
+    for cmd in ("check", "compile"):
         p = sub.add_parser(cmd)
         p.add_argument("file")
-        if cmd in ("run", "trace"):
-            p.add_argument("--input", default=None)
+
+    for cmd in ("run", "trace"):
+        p = sub.add_parser(cmd)
+        p.add_argument("file")
+        p.add_argument("--input", default=None)
+        p.add_argument("--execution-id", default=None)
+        p.add_argument("--workers", type=int, default=0)
+        p.add_argument("--store", default=None)
+
+    resume = sub.add_parser("resume")
+    resume.add_argument("execution_id")
+    resume.add_argument("--file", default=None)
+    resume.add_argument("--store", default=None)
+
+    approve = sub.add_parser("approve")
+    approve.add_argument("execution_id")
+    approve.add_argument("decision")
+    approve.add_argument("--file", default=None)
+    approve.add_argument("--store", default=None)
+    approve.add_argument("--resume", action="store_true")
+
+    worker = sub.add_parser("worker")
+    worker.add_argument("--file", required=True)
+    worker.add_argument("--store", default=None)
+    worker.add_argument("--name", default=None)
+
     init = sub.add_parser("init")
     init.add_argument("target")
     init.add_argument("--force", action="store_true")
@@ -166,6 +299,23 @@ def main():
     if args.command == "repl":
         cmd_repl(args)
         return
+    if args.command == "resume":
+        try:
+            cmd_resume(args)
+        except Exception as exc:
+            print(diagnostics_from_exception(exc))
+            raise SystemExit(1) from exc
+        return
+    if args.command == "approve":
+        try:
+            cmd_approve(args)
+        except Exception as exc:
+            print(diagnostics_from_exception(exc))
+            raise SystemExit(1) from exc
+        return
+    if args.command == "worker":
+        cmd_worker(args)
+        return
 
     try:
         pir = compile_file(args.file)
@@ -188,13 +338,14 @@ def main():
         print(json.dumps(pir, indent=2))
         return
 
-    input_data = json.loads(load(args.input)) if args.input else default_input(pir)
-    runtime = Runtime(pir, gateway=build_gateway())
-    result = runtime.run(input_data)
-    if args.command == "trace":
-        print_trace(pir, runtime, result)
-        return
-    print(json.dumps(result, indent=2))
+    if args.command in {"run", "trace"}:
+        try:
+            cmd_run_program(args, pir, trace=args.command == "trace")
+        except SystemExit:
+            raise
+        except Exception as exc:
+            print(diagnostics_from_exception(exc))
+            raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":

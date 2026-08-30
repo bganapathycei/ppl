@@ -38,17 +38,25 @@ IF score >= threshold
 
 This example illustrates an important PPL rule: risky actions should be governed by runtime-enforced controls, not merely by instructions given to a model.
 
-## 4. Recommended learning path
+## 4. Enterprise Automation
+
+`examples/enterprise_automation.ppl` exercises knowledge files, persistent memory, tools, and optional human approval. Sample documents live in `examples/knowledge/`.
+
+```text
+KNOWLEDGE + MEMORY -> AGENT -> CALL create_ticket -> RETURN
+```
+
+## 5. Recommended learning path
 
 1. Read `docs/GETTING_STARTED.md`.
 2. Run `hello_world.ppl`.
 3. Inspect its compiled representation.
 4. Run `incident.ppl` and inspect the trace.
-5. Read `docs/SPEC.md`.
-6. Study `governed_change.ppl`.
+5. Read `docs/SPEC.md` and `docs/PPL_0.9.md`.
+6. Study `governed_change.ppl` and `enterprise_automation.ppl`.
 7. Build a small read-only business workflow before adding write-capable tools.
 
-## 5. Example application ideas
+## 6. Example application ideas
 
 Good first PPL applications include:
 

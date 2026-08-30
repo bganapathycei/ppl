@@ -30,11 +30,16 @@ class Compiler:
         graph = self.compile_graph(workflows)
         if graph["nodes"]:
             ExecutionGraph([
-                GraphNode(node["id"], node["operation"], node["dependencies"])
+                GraphNode(
+                    node["id"],
+                    node["operation"],
+                    node["dependencies"],
+                    metadata=dict(node.get("metadata") or {}),
+                )
                 for node in graph["nodes"]
             ])
         return {
-            "version": "0.8",
+            "version": "0.9",
             "application": program.app.name,
             "inputs": [
                 {"name": x.name, "fields": [{"name": f.name, "type": f.type_name} for f in x.fields]}
@@ -143,36 +148,63 @@ class Compiler:
         nodes = []
         counter = [0]
 
-        def add(operation, name, deps):
+        def add(operation, step, deps, branch=None, gate=None):
             counter[0] += 1
             node_id = f"{counter[0]:02d}_{operation.lower()}"
+            meta = {"step": step}
+            if branch is not None:
+                meta["branch"] = branch
+            if gate is not None:
+                meta["gate"] = gate
+            if operation == "RUN":
+                meta["agent"] = step.get("name")
             nodes.append({
                 "id": node_id,
                 "operation": operation,
-                "name": str(name),
+                "name": str(step.get("name") or step.get("value") or operation),
                 "dependencies": list(deps),
+                "metadata": meta,
             })
             return node_id
 
-        def walk(steps, deps):
+        def walk(steps, deps, branch=None, gate=None):
             current = list(deps)
             for step in steps:
                 op = step["operation"]
                 if op == "PARALLEL":
                     ends = []
                     for child in step.get("steps", []):
-                        ends.extend(walk([child], current))
-                    current = [add("JOIN", "join", ends or current)]
+                        ends.extend(walk([child], current, branch=branch, gate=gate))
+                    join_step = {"operation": "JOIN", "names": []}
+                    current = [add("JOIN", join_step, ends or current, branch=branch, gate=gate)]
                 elif op == "IF":
-                    current = [add("IF", step.get("condition", {}), current)]
-                    walk(step.get("then", []), current)
-                    for branch in step.get("else_if", []):
-                        walk(branch.get("steps", []), current)
-                    walk(step.get("else", []), current)
+                    gate_id = add("IF", step, current, branch=branch, gate=gate)
+                    branch_ends = []
+                    then_end = walk(step.get("then", []), [gate_id], branch="then", gate=gate_id)
+                    branch_ends.extend(then_end or [gate_id])
+                    for idx, else_if in enumerate(step.get("else_if", [])):
+                        label = f"else_if_{idx}"
+                        # Attach condition onto a synthetic IF branch marker stored in step
+                        branch_step = {
+                            "operation": "ELSE_IF",
+                            "condition": else_if.get("condition"),
+                            "steps": else_if.get("steps", []),
+                        }
+                        # Evaluate else-if as part of IF gate; steps get branch label
+                        ends = walk(else_if.get("steps", []), [gate_id], branch=label, gate=gate_id)
+                        branch_ends.extend(ends or [gate_id])
+                    else_end = walk(step.get("else", []), [gate_id], branch="else", gate=gate_id)
+                    branch_ends.extend(else_end or [gate_id])
+                    # Barrier after exclusive branches so subsequent steps wait for one path
+                    join_step = {"operation": "JOIN", "names": ["if"]}
+                    current = [add("JOIN", join_step, branch_ends, branch=branch, gate=gate)]
+                elif op == "JOIN":
+                    # Explicit JOIN after PARALLEL is optional; if present, chain it
+                    current = [add("JOIN", step, current, branch=branch, gate=gate)]
                 else:
-                    current = [add(op, step.get("name") or step.get("value") or op, current)]
+                    current = [add(op, step, current, branch=branch, gate=gate)]
             return current
 
         for workflow in workflows:
             walk(workflow["steps"], [])
-        return {"nodes": nodes, "version": "0.8"}
+        return {"nodes": nodes, "version": "0.9"}

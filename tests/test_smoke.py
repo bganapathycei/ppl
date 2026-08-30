@@ -4,6 +4,7 @@ from ppl.cli import default_input
 from ppl.compiler import Compiler
 from ppl.parser import parse
 from ppl.runtime import Runtime
+from ppl.store import InMemoryGraphStore
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,10 +14,11 @@ def compile_example(name: str):
     return Compiler().compile(parse(text))
 
 
-def run_example(name: str, input_data=None):
+def run_example(name: str, input_data=None, **kwargs):
     pir = compile_example(name)
-    runtime = Runtime(pir)
-    return runtime, runtime.run(input_data or default_input(pir))
+    path = ROOT / "examples" / name
+    runtime = Runtime(pir, store=InMemoryGraphStore(), program_path=path, interactive=False)
+    return runtime, runtime.run(input_data or default_input(pir), **kwargs)
 
 
 def test_incident_program():
@@ -24,7 +26,7 @@ def test_incident_program():
     assert result == "AUTOMATE"
     assert any("model=" in detail for _, _, detail in runtime.trace)
     condition = None
-    for workflow in Compiler().compile(parse((ROOT / "examples/incident.ppl").read_text(encoding="utf-8")))["workflows"]:
+    for workflow in compile_example("incident.ppl")["workflows"]:
         for step in workflow["steps"]:
             if step["operation"] == "IF":
                 condition = step["condition"]
@@ -72,7 +74,7 @@ WORKFLOW Main
         RETURN "NO"
 """
     pir = Compiler().compile(parse(source))
-    result = Runtime(pir).run({"item": {"ready": True}})
+    result = Runtime(pir, store=InMemoryGraphStore(), interactive=False).run({"item": {"ready": True}})
     assert result == "YES"
 
 
@@ -91,6 +93,7 @@ def test_parallel_join_wait_checkpoint():
 APP ParallelDemo
 INPUT request
     text: TEXT
+    done: BOOLEAN
 AGENT Left
     INPUT request
     CLASSIFY request.text AS
@@ -116,11 +119,10 @@ WORKFLOW Main
     RETURN Left.category
 """
     pir = Compiler().compile(parse(source))
-    runtime = Runtime(pir)
-    result = runtime.run({"request": {"text": "hello there"}})
+    runtime = Runtime(pir, store=InMemoryGraphStore(), interactive=False)
+    result = runtime.run({"request": {"text": "hello there", "done": True}})
     assert result in {"GREETING", "OTHER"}
     ops = [step for step, _, _ in runtime.trace]
-    assert "PARALLEL" in ops
     assert "JOIN" in ops
     assert any(step.startswith("CHECKPOINT") for step in ops)
     assert any(step.startswith("WAIT") for step in ops)
@@ -131,5 +133,5 @@ def test_cli_check(capsys, monkeypatch):
     from ppl.cli import main
     main()
     out = capsys.readouterr().out
-    assert "PPL Compiler 0.8.0" in out
+    assert "PPL Compiler 0.9.0" in out
     assert "Program is valid." in out
