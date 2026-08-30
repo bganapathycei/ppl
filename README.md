@@ -1,24 +1,32 @@
 # PPL — Prompt Programming Language
 
-PPL is an experimental AI-native programming language for expressing deterministic computation, AI reasoning, knowledge, tools, workflows, human decisions, governance, and production runtime behavior as executable software.
+PPL is an experimental AI-native programming language for expressing deterministic computation, AI reasoning, knowledge, tools, workflows, human decisions, governance, and distributed execution as executable software.
 
 > **The prompt is source code. The model is not the runtime.**
 
-PPL source is parsed into an AST, compiled into a portable Prompt Intermediate Representation (PIR), and executed by a runtime that separates deterministic, cognitive, and human operations.
+PPL source is parsed into an AST, compiled into a portable Prompt Intermediate Representation (PIR), lowered into an execution graph, and run by a provider-neutral runtime.
 
-## Current version: 0.7 draft
+## Current version: 0.8 draft
 
-PPL 0.7 adds the production-runtime foundation:
+PPL 0.8 adds execution-graph orchestration:
 
-- asynchronous cognitive execution
-- streaming event contracts
-- typed provider/runtime error classification
-- bounded retry and backoff semantics
-- rate-limit-aware execution primitives
-- durable execution state abstraction
-- resumable execution IDs
-- model pricing abstraction
-- environment/secret separation
+- explicit graph nodes and dependencies
+- parallel branches
+- joins and dependency barriers
+- wait states
+- checkpoints
+- resume semantics
+- graph-oriented execution state
+- a path to distributed workers
+
+Previous releases added:
+
+- 0.2 — model abstraction and typed cognitive output
+- 0.3 — knowledge, memory, tools, human decisions
+- 0.4 — governance, authorization, budgets, evaluation, provenance
+- 0.5 — developer experience and onboarding
+- 0.6 — real AI provider adapters
+- 0.7 — production-runtime foundations
 
 ## New developer? Start here
 
@@ -27,8 +35,8 @@ PPL 0.7 adds the production-runtime foundation:
 3. Study [`examples/incident.ppl`](examples/incident.ppl).
 4. Study [`examples/governed_change.ppl`](examples/governed_change.ppl).
 5. Read [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
-6. Read [`docs/PPL_0.7.md`](docs/PPL_0.7.md).
-7. Read [`docs/SPEC.md`](docs/SPEC.md).
+6. Read [`docs/SPEC.md`](docs/SPEC.md).
+7. Study [`docs/PPL_0.8.md`](docs/PPL_0.8.md) and [`examples/execution_graph.py`](examples/execution_graph.py).
 
 ## Quick start
 
@@ -40,7 +48,7 @@ ppl run examples/incident.ppl
 ppl trace examples/incident.ppl
 ```
 
-For real-model execution, configure the provider through environment variables. Never put API keys in `.ppl` source.
+The bundled local cognitive adapter remains deterministic for offline development. Real model execution is available through the provider-neutral AI runtime adapters.
 
 ## Architecture
 
@@ -51,54 +59,43 @@ PPL Source
 Lexer -> Parser -> AST -> Semantic Checks -> PIR
                                       |
                                       v
-                               PPL Runtime
+                             Execution Graph
                                       |
-                  +-------------------+-------------------+
-                  |                   |                   |
-             Deterministic        Cognitive            Human
-                  |                   |                   |
-               Rules/IF        AI Gateway/Models     Approval/Review
-                  |                   |                   |
-                  +-------------------+-------------------+
+          +---------------------------+--------------------------+
+          |                           |                          |
+    Deterministic                 Cognitive                    Human
+          |                           |                          |
+       Rules/IF                 AI Gateway/Models          Approval/Review
+          |                           |                          |
+          +---------------------------+--------------------------+
                                       |
-                         Knowledge / Memory / Tools
+                       Knowledge / Memory / Tools
                                       |
-                           Execution State / Trace
+                              State / Checkpoints
                                       |
-                                  Enterprise
+                              Local / Workers
 ```
 
-## Language layers
+## Core language direction
 
 ```text
-0.1  Core language + runtime
-0.2  Model abstraction + typed cognitive output
-0.3  Knowledge + memory + tools + human decisions
-0.4  Governance + evaluation + provenance + budgets
-0.5  Developer experience
-0.6  Real AI runtime + provider abstraction
-0.7  Production runtime primitives
-1.0  Production compiler/runtime + deployment
+Intent
+  -> typed program
+  -> cognitive operations
+  -> governed execution
+  -> execution graph
+  -> observable outcome
 ```
-
-## Core design principles
-
-1. **Intent over provider API.** Application source should not be tied to an AI vendor.
-2. **Deterministic shell around cognitive operations.** Control flow remains inspectable.
-3. **Typed cognitive output.** AI responses become validated program data.
-4. **Governance is executable.** Guards and authorization are runtime controls.
-5. **Evaluation is programming.** AI behavior is tested against representative data.
-6. **Everything important is observable.** Model, policy, provenance, cost, latency, validation, tools, and human decisions should be traceable.
-7. **Production concerns stay in the runtime.** Retry, backoff, streaming, persistence, rate limits, and provider failure mapping do not leak into PPL application syntax.
 
 ## Repository map
 
 - `docs/GETTING_STARTED.md` — beginner onboarding
-- `docs/TUTORIAL.md` — step-by-step language tutorial
+- `docs/TUTORIAL.md` — step-by-step tutorial
 - `docs/EXAMPLES.md` — examples and learning path
-- `docs/SPEC.md` — language specification
-- `docs/PPL_0.7.md` — production runtime design
-- `examples/` — runnable language examples
+- `docs/SPEC.md` — canonical language specification
+- `docs/PPL_0.8.md` — execution-graph specification
+- `docs/REAL_AI_RUNTIME.md` — real model setup
+- `examples/` — language and runtime examples
 - `src/ppl/` — reference implementation
 - `tests/` — executable tests
 
