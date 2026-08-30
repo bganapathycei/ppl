@@ -1,0 +1,49 @@
+APP RealAIIncidentAdvisor
+
+INPUT incident
+    description: TEXT
+    application: TEXT
+    priority: TEXT
+
+MODEL_POLICY ProductionAI
+    reasoning: gpt-4.1-mini
+    classification: gpt-4.1-mini
+    extraction: gpt-4.1-mini
+    max_retries: 2
+    fallback: gpt-4.1-mini
+
+AGENT Analyzer
+    INPUT incident
+    POLICY ProductionAI
+
+    CLASSIFY incident.description AS
+        ACCESS
+        NETWORK
+        DATABASE
+        APPLICATION
+        INFRASTRUCTURE
+        OTHER
+
+    EXTRACT
+        root_cause: TEXT
+        resolution: TEXT
+
+    REASON
+        determine whether the incident is repetitive
+        OUTPUT:
+            repetitive: BOOLEAN
+            confidence: CONFIDENCE
+            evidence: TEXT
+
+    OUTPUT
+        category: CLASSIFICATION
+        root_cause: TEXT
+        resolution: TEXT
+        repetitive: BOOLEAN
+        confidence: CONFIDENCE
+        evidence: TEXT
+
+WORKFLOW Main
+    RECEIVE incident
+    RUN Analyzer
+    RETURN Analyzer.category
