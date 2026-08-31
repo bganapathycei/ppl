@@ -47,7 +47,7 @@ Condensed path:
 5. Follow [`docs/EXAMPLES.md`](docs/EXAMPLES.md) for each sample’s **command → input → output** (`incident` → `"AUTOMATE"`, `governed_change` → `"APPROVED"`, `enterprise_automation` → `"DATABASE"`).
 6. Read [`docs/SPEC.md`](docs/SPEC.md) only after you have run programs.
 
-Doc index: [`docs/README.md`](docs/README.md).
+Doc index: [`docs/README.md`](docs/README.md). **GitHub Wiki:** [wiki](https://github.com/bganapathycei/ppl/wiki) (see [`wiki/`](wiki/) in repo).
 
 ## Quick start
 
