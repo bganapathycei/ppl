@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 EDITOR_DIR = Path(__file__).resolve().parent
 ROOT = EDITOR_DIR.parent
+FLOW_DIST = EDITOR_DIR / "react" / "dist"
 sys.path.insert(0, str(ROOT / "src"))
 
 from ppl.ai_gateway import AIGateway  # noqa: E402
@@ -142,7 +144,56 @@ class EditorHandler(SimpleHTTPRequestHandler):
         if path == "/api/assistant/config":
             self._send_json(200, assistant_config())
             return
+        if path == "/flow":
+            self.send_response(301)
+            self.send_header("Location", "/flow/")
+            self.end_headers()
+            return
+        if path.startswith("/flow/"):
+            self._serve_flow(path[len("/flow/") :])
+            return
         super().do_GET()
+
+    def _serve_flow(self, rel: str):
+        index = FLOW_DIST / "index.html"
+        if not index.exists():
+            self._send_flow_hint()
+            return
+        target = (FLOW_DIST / (rel or "index.html")).resolve()
+        try:
+            target.relative_to(FLOW_DIST.resolve())
+        except ValueError:
+            self.send_error(403, "Forbidden")
+            return
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.exists():
+            target = index  # single-page fallback
+        data = target.read_bytes()
+        ctype = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_flow_hint(self):
+        html = (
+            "<!doctype html><meta charset=utf-8><title>PPL Flow Editor</title>"
+            "<body style='font-family:system-ui;background:#101218;color:#e7e9f0;padding:40px;line-height:1.6'>"
+            "<h1>PPL Flow Editor (React Flow)</h1>"
+            "<p>The React Flow editor has not been built yet. From the repository root run:</p>"
+            "<pre style='background:#1e2230;padding:12px 16px;border-radius:8px'>"
+            "npm --prefix editor/react install\nnpm --prefix editor/react run build</pre>"
+            "<p>Then reload <a style='color:#d4a017' href='/flow/'>/flow/</a>. "
+            "The classic editor is always available at <a style='color:#d4a017' href='/'>/</a>.</p>"
+            "</body>"
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(html)))
+        self.end_headers()
+        self.wfile.write(html)
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
