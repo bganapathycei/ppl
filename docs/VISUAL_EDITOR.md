@@ -8,6 +8,9 @@ From the repository root (package installed or `src/` on `PYTHONPATH`):
 
 ```bash
 python editor/serve.py
+# or
+./editor/run.sh          # macOS/Linux
+.\editor\run.ps1         # Windows PowerShell
 ```
 
 Open [http://127.0.0.1:8765/](http://127.0.0.1:8765/).

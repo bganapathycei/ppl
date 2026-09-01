@@ -8,13 +8,28 @@ Full user guide: [`docs/VISUAL_EDITOR.md`](../docs/VISUAL_EDITOR.md).
 
 ## Run
 
-From the repository root (with the package installed, or `src/` on `PYTHONPATH`):
+From the **editor** directory:
+
+**Windows (PowerShell):**
+
+```powershell
+.\run.ps1
+```
+
+**macOS / Linux:**
+
+```bash
+chmod +x run.sh   # first time only
+./run.sh
+```
+
+Or from anywhere in the repo:
 
 ```bash
 python editor/serve.py
 ```
 
-Open [http://127.0.0.1:8765/](http://127.0.0.1:8765/).
+Open [http://127.0.0.1:8765/](http://127.0.0.1:8765/). The run scripts verify Python 3.10+ and open the browser by default (`-NoBrowser` / `--no-browser` to skip).
 
 You can also open `index.html` as a file. Construction, source preview, Open/Download, and examples still work. Compile, run, graph preview, and the AI assistant require the server.
 
@@ -25,6 +40,8 @@ editor/
 ├── index.html          # Shell (palette | canvas | inspector | assistant)
 ├── css/editor.css
 ├── serve.py            # Static files + /api/* JSON endpoints
+├── run.ps1             # Windows startup script
+├── run.sh              # macOS/Linux startup script
 ├── assistant.py        # AI assistant routing and PPL extraction
 ├── js/
 │   ├── app.js          # Program state, toolbar, run integration
