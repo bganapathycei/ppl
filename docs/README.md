@@ -8,7 +8,8 @@ Current language and runtime: **0.10.0**.
 2. **[TUTORIAL.md](TUTORIAL.md)** — six lessons on the bundled `.ppl` files. Requires Getting Started Steps 1–6.
 3. **[EXAMPLES.md](EXAMPLES.md)** — each sample with **command → input → output** and what the graph did.
 4. **[REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md)** — live model providers (optional; no API key needed before this).
-5. **[SPEC.md](SPEC.md)** — language specification (draft 0.10). Read this after you have run programs, not before.
+5. **[VISUAL_EDITOR.md](VISUAL_EDITOR.md)** — browser editor with drag-and-drop blocks, run/trace, and AI coding assistant.
+6. **[SPEC.md](SPEC.md)** — language specification (draft 0.10). Read this after you have run programs, not before.
 
 ## Current-release notes
 
@@ -23,3 +24,7 @@ These describe what landed in that release. Prefer Getting Started and the spec 
 - [PPL_0.7.md](PPL_0.7.md) — production-runtime foundations
 - [PPL_0.6.md](PPL_0.6.md) — first real-AI adapter (OpenAI-oriented; superseded by 0.10)
 - [PPL_0.5.md](PPL_0.5.md) — CLI DX (`init`, `fmt`, `test`, `repl`)
+
+## Visual editor
+
+- [VISUAL_EDITOR.md](VISUAL_EDITOR.md) — user guide (also [`editor/README.md`](../editor/README.md) for implementation layout)

@@ -114,3 +114,18 @@ Before connecting a write-capable enterprise tool, verify:
 5. guards and authorization are evaluated;
 6. representative evaluations pass;
 7. human approval is present for high-risk actions.
+
+## Visual editor AI assistant
+
+The browser editor (`python editor/serve.py`) includes an **AI Assistant** panel for natural-language create/edit of `.ppl` programs. It uses the **same provider env vars** as the CLI runtime, but chat requires a live adapter (not `local`).
+
+```bash
+export PPL_AI_PROVIDER=openai
+export OPENAI_API_KEY=...
+export PPL_AI_MODEL=gpt-4.1-mini
+python editor/serve.py
+```
+
+In the UI, pick provider and model from the dropdowns, describe the change, then **Apply to editor** when the returned PPL validates.
+
+See [VISUAL_EDITOR.md](VISUAL_EDITOR.md) for layout, HTTP API, and workflow.

@@ -418,8 +418,9 @@ Unset `PPL_AI_PROVIDER` to return to local. Details: [REAL_AI_RUNTIME.md](REAL_A
 1. [GETTING_STARTED.md](GETTING_STARTED.md) Steps 1–6, then this file §1–2.
 2. [TUTORIAL.md](TUTORIAL.md) Lessons 1–4.
 3. §3–4 here (governance + enterprise + pause demo).
-4. [PPL_0.9.md](PPL_0.9.md), [PPL_0.10.md](PPL_0.10.md), [SPEC.md](SPEC.md).
-5. `ppl init my-app` and build a **read-only** workflow before write-capable tools.
+4. [VISUAL_EDITOR.md](VISUAL_EDITOR.md) — optional browser editor with the same examples in the Example menu.
+5. [PPL_0.9.md](PPL_0.9.md), [PPL_0.10.md](PPL_0.10.md), [SPEC.md](SPEC.md).
+6. `ppl init my-app` and build a **read-only** workflow before write-capable tools.
 
 ---
 

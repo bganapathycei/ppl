@@ -63,7 +63,7 @@ Workers share `FileExecutionStore` and claim PENDING ready nodes. This is a **lo
 
 Anthropic and Google adapters shipped in [PPL 0.10](PPL_0.10.md). Remaining non-goals of the 0.9 slice:
 
-- IDE / language server
+- language server / VS Code extension (browser visual editor ships in `editor/`)
 - Kubernetes, message queues, or network RPC
 - Exactly-once side effects
 - Cross-provider fallback chains

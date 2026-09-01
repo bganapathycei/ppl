@@ -21,7 +21,9 @@ PPL 0.9 made the graph runtime real on a single machine:
 - overlapping PARALLEL branches
 - local multiprocessing workers (`--workers N`)
 
-Still out of scope: remote distributed workers, IDE, cross-provider fallback chains.
+Still out of scope: remote distributed workers, language server / VS Code extension, cross-provider fallback chains.
+
+The repo includes a **browser visual editor** with drag-and-drop blocks, run/trace, and an AI coding assistant — see [`editor/README.md`](editor/README.md) and [`docs/VISUAL_EDITOR.md`](docs/VISUAL_EDITOR.md).
 
 Previous releases added:
 
@@ -123,8 +125,10 @@ Parser -> AST -> Semantic Checks -> PIR
 - `docs/PPL_0.9.md` — durable runtime and local workers
 - `docs/PPL_0.10.md` — multi-provider LLM adapters
 - `docs/REAL_AI_RUNTIME.md` — real model setup
+- `docs/VISUAL_EDITOR.md` — browser editor and AI assistant
 - `docs/PPL_0.5.md` … `PPL_0.8.md` — historical release notes
 - `examples/` — language and runtime examples
+- `editor/` — visual drag-and-drop editor + AI assistant (`python editor/serve.py`) — see [`docs/VISUAL_EDITOR.md`](docs/VISUAL_EDITOR.md)
 - `src/ppl/` — reference implementation
 - `tests/` — executable tests
 

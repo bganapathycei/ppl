@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PPL Editor</title>
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">
+      <span class="brand-mark">PPL</span>
+      <span class="brand-name">Editor</span>
+    </div>
+    <div class="toolbar-group">
+      <button type="button" id="btn-new" title="New program">New</button>
+      <button type="button" id="btn-open" title="Open a .ppl file">Open</button>
+      <button type="button" id="btn-download" title="Download .ppl source">Download</button>
+      <label class="toolbar-select">
+        <span>Example</span>
+        <select id="example-select">
+          <option value="">Load example…</option>
+          <option value="hello_world">hello_world</option>
+          <option value="incident">incident</option>
+          <option value="governed_change">governed_change</option>
+          <option value="enterprise_automation">enterprise_automation</option>
+        </select>
+      </label>
+      <button type="button" id="btn-validate" title="Parse and compile">Validate</button>
+      <button type="button" id="btn-run" class="primary" title="Run with the PPL runtime">Run</button>
+    </div>
+    <div id="status" class="status" role="status">Ready</div>
+    <input id="open-file" type="file" accept=".ppl,text/plain" hidden>
+  </header>
+
+  <main class="workspace">
+    <aside id="palette" class="palette" aria-label="PPL constructs"></aside>
+    <section class="canvas-wrap">
+      <div id="issues" class="issues" hidden></div>
+      <div id="canvas" class="canvas" aria-label="Program canvas"></div>
+    </section>
+    <aside class="inspector" aria-label="Source and graph">
+      <div class="inspector-pane source-pane">
+        <h2>Source</h2>
+        <pre id="source" class="source"></pre>
+      </div>
+      <div class="inspector-pane run-pane">
+        <h2>Run</h2>
+        <label class="run-label" for="run-input">Input JSON</label>
+        <textarea id="run-input" class="run-input" spellcheck="false" placeholder='{"request": {"text": "hello there"}}'></textarea>
+        <div id="run-actions" class="run-actions" hidden>
+          <span class="run-label">Human decision</span>
+          <div id="run-human" class="run-human"></div>
+        </div>
+        <h3 class="run-subhead">Result</h3>
+        <pre id="run-result" class="run-result">Run the program to see output here.</pre>
+        <h3 class="run-subhead">Trace</h3>
+        <div id="run-trace" class="run-trace"></div>
+      </div>
+      <div class="inspector-pane graph-pane">
+        <h2>Execution graph</h2>
+        <p id="graph-meta" class="graph-meta"></p>
+        <div id="graph" class="graph"></div>
+      </div>
+    </aside>
+    <aside id="assistant" class="assistant" aria-label="AI coding assistant"></aside>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -111,6 +111,19 @@ Adapters request JSON per provider capabilities. PPL **always re-validates** aga
 
 Unset `PPL_AI_PROVIDER` (or set `local`) for offline deterministic runs. No API key required.
 
+## Visual editor AI assistant
+
+The browser editor (`python editor/serve.py`) exposes an **AI Assistant** panel with the same provider registry. Chat requires a live adapter; program **Run** in the editor still works with `local`.
+
+1. Set env vars (see Quick setup above).
+2. Start `python editor/serve.py`.
+3. Pick provider and model in the assistant sidebar.
+4. Describe edits in natural language; **Apply to editor** when PPL validates.
+
+`GET /api/assistant/config` lists providers and key availability. `POST /api/assistant/chat` sends messages plus optional `current_source`.
+
+See [[Visual Editor]].
+
 ## Production checklist
 
 Before write-capable tools in production:
@@ -125,4 +138,4 @@ Before write-capable tools in production:
 
 ---
 
-**See also:** [[Architecture]] · [[Examples]]
+**See also:** [[Visual Editor]] · [[Architecture]] · [[Examples]]

@@ -47,6 +47,7 @@ After the first push: **https://github.com/bganapathycei/ppl/wiki**
 |---|---|
 | `Home.md` | Home |
 | `Getting-Started.md` | Getting Started |
+| `Visual-Editor.md` | Visual Editor |
 | `Architecture.md` | Architecture |
 | `Language-Reference.md` | Language Reference |
 | `CLI-Reference.md` | CLI Reference |

@@ -96,6 +96,23 @@ Override store location: `PPL_STATE_DIR` or `--store`.
 
 `.ppl` source declares **intent** (`MODEL_POLICY` slots like `reasoning-default`). The runtime substitutes `PPL_AI_MODEL` or provider defaults. No vendor URLs or API keys in source files.
 
+## Visual editor
+
+The browser editor (`editor/serve.py`) mirrors the compile → graph → run pipeline for interactive development:
+
+```text
+Canvas document model  →  codegen.js  →  .ppl source
+                              ↓
+                    POST /api/compile  →  execution graph (inspector)
+                              ↓
+                    POST /api/run      →  Runtime + FileExecutionStore
+                              ↓
+                    AI Assistant       →  POST /api/assistant/chat
+                                         (live provider, apply valid PPL)
+```
+
+The assistant reuses the same HTTP provider adapters as cognitive runtime operations, but is a separate chat path for editing source — not graph execution.
+
 ---
 
-**See also:** [[Runtime and Execution Graph]] · [[Providers and LLM Configuration]]
+**See also:** [[Visual Editor]] · [[Runtime and Execution Graph]] · [[Providers and LLM Configuration]]

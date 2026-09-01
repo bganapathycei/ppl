@@ -94,7 +94,17 @@ ppl run my-app/app.ppl
 5. Add `GUARD` / `HUMAN_APPROVAL` before write-capable `CALL`s
 6. Connect a live provider only after local traces look right — see [[Providers and LLM Configuration]]
 
-## 7. Troubleshooting
+## 7. Visual editor (optional)
+
+```bash
+python editor/serve.py
+```
+
+Open **http://127.0.0.1:8765/** — palette, canvas, inspector (source / run / graph), and **AI Assistant** on the right.
+
+See [[Visual Editor]] for the full workflow, provider setup, and HTTP API.
+
+## 8. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -102,7 +112,8 @@ ppl run my-app/app.ppl
 | `ERROR: ...` on check | Run from repo root; verify file path |
 | Exit code **2** on run | Execution is `WAITING` (human approval) — use `ppl approve` or `PPL_HUMAN_DECISION=APPROVE` |
 | Live provider auth error | Unset `PPL_AI_PROVIDER` to return to `local` |
+| AI assistant unavailable | Start `python editor/serve.py`; configure a live provider for chat |
 
 ---
 
-**Next:** [[Language Reference]] · [[CLI Reference]] · [[Examples]]
+**Next:** [[Visual Editor]] · [[Language Reference]] · [[CLI Reference]] · [[Examples]]

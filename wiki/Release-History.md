@@ -13,6 +13,17 @@ PPL is experimental. Version **0.10.0** is the current release.
 - `MODEL_POLICY` placeholder → `PPL_AI_MODEL` substitution
 - No vendor SDKs (HTTP only)
 
+## Editor (browser)
+
+Shipped alongside 0.10 in the repository (not a semver bump):
+
+- Visual drag-and-drop editor for complete PPL 0.10 programs
+- In-browser compile, run, trace, and execution-graph preview
+- AI coding assistant with provider/model picker (Copilot-style sidebar)
+- Natural language create/edit; validated PPL apply back to canvas
+
+See [[Visual Editor]].
+
 ## 0.9 — Durable graph runtime and local workers
 
 - `FileExecutionStore` — `.ppl/executions/<id>.json`
@@ -80,7 +91,7 @@ PPL is experimental. Version **0.10.0** is the current release.
 
 - Cross-provider fallback chains (0.10.1)
 - Remote distributed worker cluster
-- IDE / language server
+- Language server / VS Code extension
 - GitHub Release binaries (PyInstaller/Nuitka)
 - Exactly-once external side effects
 

@@ -114,6 +114,10 @@ Failed nodes set execution status `FAILED` with error metadata. Node-level retry
 - model, latency, tokens, cost for cognitive steps
 - worker assignment (when using `--workers`)
 
+## Visual editor preview
+
+The browser editor (`python editor/serve.py`) calls `POST /api/compile` to render the same execution graph in the inspector pane, and `POST /api/run` for in-browser execute/trace/human resume. See [[Visual Editor]].
+
 ---
 
-**See also:** [[Architecture]] · [[Governance and Human Approval]]
+**See also:** [[Visual Editor]] · [[Architecture]] · [[Governance and Human Approval]]

@@ -1,0 +1,19 @@
+APP HelloAI
+
+INPUT request
+    text: TEXT
+
+AGENT Classifier
+    INPUT request
+    CLASSIFY request.text AS
+        GREETING
+        QUESTION
+        OTHER
+    OUTPUT
+        category
+        confidence
+
+WORKFLOW Main
+    RECEIVE request
+    RUN Classifier
+    RETURN Classifier.category

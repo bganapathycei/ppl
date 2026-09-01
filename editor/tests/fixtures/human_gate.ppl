@@ -1,0 +1,14 @@
+APP HumanGate
+
+INPUT request
+    text: TEXT
+
+WORKFLOW Main
+    RECEIVE request
+    HUMAN_APPROVAL
+        QUESTION:
+            continue?
+        OPTIONS:
+            APPROVE
+            REJECT
+    RETURN "OK"

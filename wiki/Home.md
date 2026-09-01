@@ -33,6 +33,7 @@ ppl run examples/hello_world.ppl
 | Page | Description |
 |---|---|
 | [[Getting Started]] | Install, first run, daily workflow |
+| [[Visual Editor]] | Browser editor, run/trace, AI coding assistant |
 | [[Architecture]] | Compiler, PIR, execution graph, runtime |
 | [[Language Reference]] | Syntax, keywords, execution classes |
 | [[CLI Reference]] | All `ppl` commands and flags |
@@ -55,11 +56,12 @@ ppl run examples/hello_world.ppl
 - **Human-in-the-loop** — `HUMAN_APPROVAL`, `ppl approve`, `ppl resume`
 - **Local workers** — `--workers N` process pool (single machine)
 - **Developer CLI** — `check`, `compile`, `run`, `trace`, `init`, `fmt`, `test`, `repl`
+- **Visual editor** — drag-and-drop blocks, in-browser run/trace, AI coding assistant (`python editor/serve.py`)
 
 ## What is out of scope (0.10)
 
 - Remote distributed worker cluster
-- IDE / language server
+- Language server / VS Code extension
 - Cross-provider fallback chains
 - Vendor SDKs in the runtime (HTTP only)
 

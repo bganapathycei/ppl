@@ -1,0 +1,87 @@
+APP CompleteEditor
+
+ENVIRONMENT staging
+    region us-east
+
+INPUT request
+    text: TEXT
+
+MODEL_POLICY Default
+    reasoning: reasoning-default
+    classification: classification-default
+    extraction: extraction-default
+    max_retries: 1
+    fallback: fallback-default
+
+KNOWLEDGE Docs
+    SOURCE runbooks
+
+MEMORY History
+    KEY request.text
+    READ items
+
+TOOL Echo
+    ACTION echo
+    INPUT
+        text: TEXT
+    OUTPUT
+        text: TEXT
+
+GUARD Safety
+    NEVER skip approval
+
+AUTHORIZATION read
+    REQUIRES read
+
+BUDGET
+    max_cost: 0.10
+    max_steps: 20
+
+AGENT Classifier
+    INPUT request
+    POLICY Default
+    USE KNOWLEDGE Docs
+    USE MEMORY History
+    CLASSIFY request.text AS
+        GREETING
+        OTHER
+    EXTRACT
+        topic: TEXT
+    REASON
+        summarize
+        consider:
+            brevity
+        OUTPUT:
+            summary: TEXT
+            confidence: CONFIDENCE
+    OUTPUT
+        category
+        confidence
+        summary: TEXT
+        topic: TEXT
+
+AGENT Other
+    INPUT request
+    CLASSIFY request.text AS
+        OTHER
+
+WORKFLOW Main
+    RECEIVE request
+    PARALLEL
+        RUN Classifier
+        RUN Other
+    JOIN Classifier
+    WAIT 1s
+    CHECKPOINT mid
+    CALL Echo.echo
+        text = request.text
+    IF Classifier.confidence < 0.90
+        HUMAN_APPROVAL
+            QUESTION:
+                continue
+            OPTIONS:
+                APPROVE
+                REJECT
+    ELSE
+        RETURN "OK"
+    RETURN Classifier.category

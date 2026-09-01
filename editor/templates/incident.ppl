@@ -1,0 +1,75 @@
+APP IncidentAdvisor
+
+MODEL_POLICY EnterpriseDefault
+    reasoning: reasoning-default
+    classification: classification-default
+    extraction: extraction-default
+    max_retries: 2
+    fallback: fallback-default
+
+INPUT incident
+    description: TEXT
+    application: TEXT
+    priority: TEXT
+
+AGENT Analyzer
+    INPUT incident
+    POLICY EnterpriseDefault
+
+    CLASSIFY incident.description AS
+        ACCESS
+        NETWORK
+        DATABASE
+        APPLICATION
+        INFRASTRUCTURE
+        OTHER
+
+    EXTRACT
+        root_cause: TEXT
+        resolution: TEXT
+
+    REASON
+        determine whether the incident is repetitive
+        OUTPUT:
+            repetitive: BOOLEAN
+            confidence: CONFIDENCE
+
+    OUTPUT
+        category: CLASSIFICATION
+        root_cause: TEXT
+        resolution: TEXT
+        repetitive: BOOLEAN
+        confidence: CONFIDENCE
+
+AGENT AutomationAdvisor
+    INPUT Analyzer
+    POLICY EnterpriseDefault
+
+    REASON
+        determine whether this incident is a good candidate for automation
+        consider:
+            repetition
+            resolution complexity
+            human intervention
+            business risk
+        OUTPUT:
+            score: NUMBER
+            rationale: TEXT
+            confidence: CONFIDENCE
+
+    OUTPUT
+        score: NUMBER
+        rationale: TEXT
+        confidence: CONFIDENCE
+
+WORKFLOW Main
+    RECEIVE incident
+    RUN Analyzer
+    RUN AutomationAdvisor
+
+    IF AutomationAdvisor.score >= 80
+        RETURN "AUTOMATE"
+    ELSE IF AutomationAdvisor.score >= 50
+        RETURN "PARTIALLY_AUTOMATE"
+    ELSE
+        RETURN "KEEP_HUMAN"

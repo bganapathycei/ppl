@@ -141,6 +141,8 @@ See [[Providers and LLM Configuration]].
 | `governed_change.ppl` | `ppl run examples/governed_change.ppl` | `"APPROVED"` |
 | `enterprise_automation.ppl` | `ppl run examples/enterprise_automation.ppl` | `"DATABASE"` |
 
+The same four programs are bundled in the visual editor **Example** menu. Run them in the browser with `python editor/serve.py` — see [[Visual Editor]].
+
 ---
 
-**See also:** [[Getting Started]] · [[Language Reference]]
+**See also:** [[Visual Editor]] · [[Getting Started]] · [[Language Reference]]

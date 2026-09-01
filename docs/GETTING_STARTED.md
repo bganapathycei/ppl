@@ -13,7 +13,8 @@ Current release: **0.10.0**. Python **3.10+**.
 | Run your first program today | Steps 1–6 (~15 minutes) |
 | Write your own `.ppl` file | Continue through Step 9 |
 | Learn the language by example | Step 11, then [TUTORIAL.md](TUTORIAL.md) |
-| Contribute to the Python runtime | Step 15 |
+| Use the visual editor + AI assistant | Step 17 |
+| Contribute to the Python runtime | Step 16 |
 
 ---
 
@@ -641,6 +642,7 @@ The language lives in `.ppl` files. The reference interpreter is Python under `s
 
 ```text
 src/ppl/          parser, compiler, runtime, CLI, providers
+editor/           visual editor + AI assistant (optional)
 examples/         programs you can run
 tests/            pytest suite
 docs/             this guide and the spec
@@ -669,9 +671,45 @@ Useful starting points:
 | Parse / compile | `src/ppl/parser.py`, `src/ppl/compiler.py` |
 | Graph execution | `src/ppl/runtime.py`, `src/ppl/execution_graph.py` |
 | Local vs live models | `src/ppl/ai_gateway.py`, `src/ppl/provider.py` |
+| Visual editor | [VISUAL_EDITOR.md](VISUAL_EDITOR.md), `editor/` |
 | Language contract | [SPEC.md](SPEC.md) |
 
 After a Python change, re-run `ppl check examples/hello_world.ppl` and `ppl test` before you consider the change done.
+
+Editor tests: `python -m pytest editor/tests -q`.
+
+---
+
+## Step 17 — Visual editor and AI assistant (optional)
+
+After Steps 1–6 you can use the browser editor instead of (or alongside) the CLI.
+
+```bash
+python editor/serve.py
+```
+
+Open [http://127.0.0.1:8765/](http://127.0.0.1:8765/).
+
+| Panel | What it does |
+|---|---|
+| Palette + Canvas | Drag-and-drop nested PPL blocks |
+| Inspector | Live source, **Run** with input JSON and trace, execution graph |
+| AI Assistant | Natural language to create or edit programs; provider/model picker |
+
+**Offline:** block editing, examples, Open/Download work without API keys. **Run** uses the same local adapter as the CLI.
+
+**AI Assistant:** requires a live provider configured before you start the server (same env vars as Step 15):
+
+```bash
+export PPL_AI_PROVIDER=openai
+export OPENAI_API_KEY=...
+export PPL_AI_MODEL=gpt-4.1-mini
+python editor/serve.py
+```
+
+Describe changes in plain language, then click **Apply to editor** when the assistant returns valid PPL.
+
+Full guide: [VISUAL_EDITOR.md](VISUAL_EDITOR.md).
 
 ---
 
@@ -725,6 +763,7 @@ Exit status **2** means the run is `WAITING` (human approval or `WAIT` predicate
 | `ppl run` exits with status 2 | The graph is `WAITING`. Use `ppl approve` / `ppl resume`, or set `PPL_HUMAN_DECISION`. |
 | Enterprise example “hangs” on `Decision>` | Type `APPROVE` or `REJECT`, or run non-interactively with `PPL_HUMAN_DECISION=APPROVE`. |
 | Live provider errors about API keys | Unset `PPL_AI_PROVIDER` to go back to `local`, or set the vendor key from [REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md). |
+| Visual editor / AI assistant unavailable | Run `python editor/serve.py` from repo root. Chat needs a live provider; Run works offline — see [VISUAL_EDITOR.md](VISUAL_EDITOR.md). |
 | Knowledge looks empty | Put `name.md` next to the program, in `examples/knowledge/`, or set `PPL_KNOWLEDGE_DIR`. |
 | Tests fail with “pytest not found” | `python -m pip install pytest` then `ppl test`. |
 
@@ -777,8 +816,9 @@ WORKFLOW Main
 ## Where to go next
 
 1. [TUTORIAL.md](TUTORIAL.md) — six short lessons on the bundled examples (do these in order).
-2. [EXAMPLES.md](EXAMPLES.md) — example index and first-app ideas.
-3. [REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md) — live providers.
-4. [PPL_0.9.md](PPL_0.9.md) — durable graph runtime and local workers.
-5. [PPL_0.10.md](PPL_0.10.md) — multi-provider adapters.
-6. [SPEC.md](SPEC.md) — language specification (draft 0.10).
+2. [VISUAL_EDITOR.md](VISUAL_EDITOR.md) — browser editor, run/trace, AI coding assistant.
+3. [EXAMPLES.md](EXAMPLES.md) — example index and first-app ideas.
+4. [REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md) — live providers.
+5. [PPL_0.9.md](PPL_0.9.md) — durable graph runtime and local workers.
+6. [PPL_0.10.md](PPL_0.10.md) — multi-provider adapters.
+7. [SPEC.md](SPEC.md) — language specification (draft 0.10).

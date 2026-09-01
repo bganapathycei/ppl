@@ -299,6 +299,7 @@ Provider-neutral source; configuration lives outside the program.
 
 ## After the tutorial
 
+- [VISUAL_EDITOR.md](VISUAL_EDITOR.md) — browser editor, run/trace, AI coding assistant
 - [EXAMPLES.md](EXAMPLES.md) — more programs and first-app ideas
 - [SPEC.md](SPEC.md) — semantics
 - [PPL_0.10.md](PPL_0.10.md) — adapter registry
