@@ -8,8 +8,8 @@
 import { BLOCKS } from "./schema.js";
 
 export const FLOW = {
-  nodeW: 210,
-  nodeMinH: 46,
+  nodeW: 220,
+  nodeMinH: 58,
   lineH: 15,
   vGap: 34,
   hGap: 40,

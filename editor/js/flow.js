@@ -31,10 +31,14 @@ function renderEdges(layout) {
     .join("");
   const labels = layout.edges
     .filter((e) => e.label)
-    .map(
-      (e) =>
-        `<text class="flow-edge-label" x="${e.labelX}" y="${e.labelY}" text-anchor="middle">${esc(e.label)}</text>`,
-    )
+    .map((e) => {
+      const text = e.label.length > 22 ? e.label.slice(0, 21) + "…" : e.label;
+      const w = text.length * 6 + 10;
+      return `<g class="flow-label-g">
+        <rect class="flow-edge-label-bg" x="${e.labelX - w / 2}" y="${e.labelY - 9}" width="${w}" height="15" rx="4"/>
+        <text class="flow-edge-label" x="${e.labelX}" y="${e.labelY + 2}" text-anchor="middle">${esc(text)}</text>
+      </g>`;
+    })
     .join("");
   return `<svg class="flow-edges" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}">
     <defs>
