@@ -1,0 +1,17 @@
+{
+  "name": "PPL — Prompt Programming Language",
+  "install": "python3 -m pip install -e . pytest",
+  "terminals": [
+    {
+      "name": "editor",
+      "command": "python3 editor/serve.py",
+      "description": "PPL visual editor + AI assistant server at http://127.0.0.1:8765/ (POST /api/compile, /api/run). Uses the offline local adapter unless PPL_AI_PROVIDER is configured."
+    }
+  ],
+  "ports": [
+    {
+      "name": "visual editor",
+      "port": 8765
+    }
+  ]
+}
