@@ -42,8 +42,29 @@ def test_layout_geometry_and_ids(require_node):
         assert item["addChips"] >= 1, f"{item['file']}: missing add affordance"
 
 
-def test_branching_examples_fan_out_and_merge(require_node):
+def test_if_fans_out_into_labeled_branches(require_node):
     incident = EDITOR / "templates" / "incident.ppl"
     [item] = _run([incident])
-    assert item["merges"] >= 1, "IF should produce a merge point"
     assert item["edgeKinds"].get("branch", 0) >= 2, "IF should fan out into labeled branches"
+    # Every branch in incident's IF ends in RETURN, so the paths terminate and
+    # there is no merge point back into the workflow.
+    assert item["merges"] == 0, "all-RETURN branches should not merge"
+
+
+def test_non_terminal_if_merges(require_node, tmp_path):
+    source = (
+        "APP Demo\n\n"
+        "INPUT request\n    text: TEXT\n\n"
+        "WORKFLOW Main\n"
+        "    RECEIVE request\n"
+        "    IF request.text == TRUE\n"
+        "        CHECKPOINT a\n"
+        "    ELSE\n"
+        "        CHECKPOINT b\n"
+        "    RETURN request.text\n"
+    )
+    path = tmp_path / "merge.ppl"
+    path.write_text(source, encoding="utf-8")
+    [item] = _run([path])
+    assert item["merges"] >= 1, "branches that fall through should merge back"
+    assert item["edgeKinds"].get("branch", 0) >= 2, "IF should fan out"
