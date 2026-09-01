@@ -29,10 +29,19 @@ You can open `editor/index.html` as a file for offline block editing and source 
 └──────────┴─────────────────────┴─────────────────┴──────────────────┘
 ```
 
+A toolbar **Flow / Blocks** toggle switches the canvas between an interactive
+**flowchart** (auto-laid-out from the program, with a Properties inspector for the selected
+node) and the original nested **Blocks** editor. Both edit the same program and generate
+identical `.ppl`.
+
+> A separate, more polished node-canvas front end built with React Flow lives in
+> [`editor/react/`](../editor/react/) and is served at `/flow/` after a build — see
+> [`editor/react/README.md`](../editor/react/README.md).
+
 | Panel | Purpose |
 |---|---|
-| **Palette** | Drag or click-to-place PPL constructs (APP, INPUT, AGENT, WORKFLOW, governance, enterprise, …) |
-| **Canvas** | Nested typed drop zones, inline edit, reorder, delete |
+| **Palette** | Drag or click-to-place PPL constructs (APP, INPUT, AGENT, WORKFLOW, governance, enterprise, …); in Flow view, click a palette block then a canvas “+” to add |
+| **Canvas** | Flow: pan/zoom flowchart with select + “+” add. Blocks: nested typed drop zones, inline edit, reorder, delete |
 | **Inspector — Source** | Live `.ppl` generated from the canvas |
 | **Inspector — Run** | Input JSON, result, trace, human-approval buttons |
 | **Inspector — Graph** | Compiled execution graph (SVG) |
