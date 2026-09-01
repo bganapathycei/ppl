@@ -6,6 +6,19 @@ All editor code lives in this folder. The language runtime in `src/ppl/` is unch
 
 Full user guide: [`docs/VISUAL_EDITOR.md`](../docs/VISUAL_EDITOR.md).
 
+## Two canvases
+
+- **Classic editor** (this folder, no build): the toolbar has a **Flow / Blocks** toggle.
+  *Flow* is an interactive flowchart (auto-laid-out from the program, with a Properties
+  panel); *Blocks* is the original nested-block editor. Open with `python editor/serve.py`.
+- **React Flow editor** ([`react/`](react/), optional build): a polished node-canvas front
+  end built with `@xyflow/react` + dagre, served at
+  [`/flow/`](http://127.0.0.1:8765/flow/) after `npm --prefix editor/react run build`.
+  See [`react/README.md`](react/README.md).
+
+Both talk to the same `serve.py` API and reuse the same `.ppl` parser/codegen, so the
+generated source is identical across views.
+
 ## Run
 
 From the **editor** directory:

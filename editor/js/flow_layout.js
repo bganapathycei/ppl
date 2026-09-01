@@ -8,8 +8,8 @@
 import { BLOCKS } from "./schema.js";
 
 export const FLOW = {
-  nodeW: 210,
-  nodeMinH: 46,
+  nodeW: 220,
+  nodeMinH: 58,
   lineH: 15,
   vGap: 34,
   hGap: 40,
@@ -27,7 +27,7 @@ const TONE_OF = {
   ent: "ent",
 };
 
-function tone(kind) {
+export function tone(kind) {
   return TONE_OF[BLOCKS[kind]?.tone] || "det";
 }
 
@@ -43,7 +43,7 @@ function conditionText(node) {
 }
 
 // Primary + secondary lines shown inside a flow node.
-function summarize(node) {
+export function summarize(node) {
   switch (node.kind) {
     case "app":
       return [node.name || "MyApplication"];
@@ -151,12 +151,15 @@ function makeBox(node, { role = "node", selectable = true } = {}) {
 }
 
 // A leaf produces a single box; ports are top-center / bottom-center.
-function measureLeaf(box) {
+// `terminal` marks a node that ends the path (RETURN), so callers omit the
+// outgoing flow arrow.
+function measureLeaf(box, terminal = false) {
   return {
     w: box.w,
     h: box.h,
     inX: box.w / 2,
     outX: box.w / 2,
+    terminal,
     items: [{ ...box, x: 0, y: 0 }],
     edges: [],
   };
@@ -198,9 +201,8 @@ function emptyBranchBox() {
 function measureSequence(steps, ownerId, slot) {
   const child = (steps || []).map(measureStep);
   if (!child.length) {
-    const box = emptyBranchBox();
-    const leaf = measureLeaf(box);
-    leaf.addTarget = { ownerId, slot, index: 0 };
+    const leaf = measureLeaf(emptyBranchBox());
+    leaf.terminal = false;
     return leaf;
   }
   const axis = Math.max(...child.map((c) => c.inX));
@@ -209,16 +211,17 @@ function measureSequence(steps, ownerId, slot) {
   const edges = [];
   let width = 0;
   let prev = null;
-  child.forEach((c, i) => {
+  child.forEach((c) => {
     const dx = axis - c.inX;
     offset(c, dx, y);
     items.push(...c.items);
     edges.push(...c.edges);
     width = Math.max(width, dx + c.w);
-    if (prev) {
+    // No arrow out of a terminal (RETURN) step: the next sibling is unreachable.
+    if (prev && !prev.terminal) {
       edges.push({ x1: prev.outAbsX, y1: prev.outAbsY, x2: axis, y2: y, kind: "flow" });
     }
-    prev = { outAbsX: dx + c.outX, outAbsY: y + c.h };
+    prev = { outAbsX: dx + c.outX, outAbsY: y + c.h, terminal: c.terminal };
     y += c.h + FLOW.vGap;
   });
   const height = y - FLOW.vGap;
@@ -227,20 +230,22 @@ function measureSequence(steps, ownerId, slot) {
     h: height,
     inX: axis,
     outX: prev.outAbsX,
+    terminal: prev.terminal,
     items,
     edges,
-    addTarget: { ownerId, slot, index: child.length },
   };
 }
 
 // Branch container shared by IF and PARALLEL: a header fans out to lanes that
-// merge into a single point, so control flow reads as a real diagram.
-function measureBranches(headerBox, branches, mergeId) {
+// merge into a single point, so control flow reads as a real diagram. Lanes
+// that terminate (all-RETURN) do not connect onward to the merge.
+function measureBranches(headerBox, branches, terminal) {
   const header = measureLeaf(headerBox);
   const laneLayouts = branches.map((b) => b.layout);
   const totalW = laneLayouts.reduce((sum, l) => sum + l.w, 0) + FLOW.hGap * Math.max(0, laneLayouts.length - 1);
   const laneTop = header.h + FLOW.vGap + 14;
   const maxLaneH = Math.max(...laneLayouts.map((l) => l.h), 1);
+  const hasMerge = branches.some((b) => !b.layout.terminal);
 
   const centerX = totalW / 2;
   const items = [];
@@ -254,22 +259,11 @@ function measureBranches(headerBox, branches, mergeId) {
   const headerOutY = header.h;
 
   const mergeY = laneTop + maxLaneH + FLOW.vGap;
-  const mergeBox = {
-    kind: "merge",
-    id: mergeId,
-    nodeKind: "merge",
-    role: "merge",
-    selectable: false,
-    w: FLOW.mergeR * 2,
-    h: FLOW.mergeR * 2,
-    x: centerX - FLOW.mergeR,
-    y: mergeY,
-  };
 
   let x = 0;
-  branches.forEach((b, i) => {
+  branches.forEach((b) => {
     const lane = b.layout;
-    const dx = x - 0;
+    const dx = x;
     offset(lane, dx, laneTop);
     items.push(...lane.items);
     edges.push(...lane.edges);
@@ -285,17 +279,30 @@ function measureBranches(headerBox, branches, mergeId) {
       labelX: (headerOutX + laneInX) / 2,
       labelY: headerOutY + (laneTop - headerOutY) / 2,
     });
-    edges.push({ x1: laneOutX, y1: laneTop + lane.h, x2: centerX, y2: mergeY + FLOW.mergeR, kind: "merge" });
+    if (hasMerge && !lane.terminal) {
+      edges.push({ x1: laneOutX, y1: laneTop + lane.h, x2: centerX, y2: mergeY + FLOW.mergeR, kind: "merge" });
+    }
     x += lane.w + FLOW.hGap;
   });
 
-  items.push(mergeBox);
-  const height = mergeY + FLOW.mergeR * 2;
+  if (hasMerge) {
+    items.push({
+      kind: "merge",
+      role: "merge",
+      selectable: false,
+      w: FLOW.mergeR * 2,
+      h: FLOW.mergeR * 2,
+      x: centerX - FLOW.mergeR,
+      y: mergeY,
+    });
+  }
+  const height = hasMerge ? mergeY + FLOW.mergeR * 2 : laneTop + maxLaneH;
   return {
     w: totalW,
     h: height,
     inX: centerX,
     outX: centerX,
+    terminal,
     items,
     edges,
   };
@@ -311,28 +318,26 @@ function measureIf(node) {
       layout: measureSequence(branch.children, branch.id, "children"),
     });
   }
+  const hasElse = (node.elseChildren || []).length > 0;
   branches.push({ label: "else", layout: measureSequence(node.elseChildren, node.id, "elseChildren") });
-  return measureBranches(header, branches, `${node.id}__merge`);
+  // The whole IF terminates only if every path (including a real else) returns.
+  const terminal = hasElse && branches.every((b) => b.layout.terminal);
+  return measureBranches(header, branches, terminal);
 }
 
 function measureParallel(node) {
   const header = makeBox(node);
   const kids = node.children || [];
   const branches = kids.length
-    ? kids.map((child, i) => ({ label: `branch ${i + 1}`, layout: measureLeafFromStep(child) }))
+    ? kids.map((child, i) => ({ label: `branch ${i + 1}`, layout: measureStep(child) }))
     : [{ label: "branch", layout: measureSequence([], node.id, "children") }];
-  return measureBranches(header, branches, `${node.id}__join`);
-}
-
-function measureLeafFromStep(child) {
-  const single = measureStep(child);
-  return single;
+  return measureBranches(header, branches, false);
 }
 
 function measureStep(node) {
   if (node.kind === "if") return measureIf(node);
   if (node.kind === "parallel") return measureParallel(node);
-  return measureLeaf(makeBox(node));
+  return measureLeaf(makeBox(node), node.kind === "return");
 }
 
 function makeAddChip(ownerId, slot, index, label) {
@@ -420,18 +425,20 @@ export function layoutProgram(program, options = {}) {
       kind: "flow",
     });
 
-    // "+ step" chip below the workflow body.
+    // "+ step" chip below the workflow body (no connector from a terminal path).
     const chip = makeAddChip(wf.id, "children", (wf.children || []).length, "+ step");
     const chipX = FLOW.pad + axis - chip.w / 2;
     const chipY = bodyY + body.h + FLOW.vGap;
     items.push({ ...chip, x: chipX, y: chipY });
-    edges.push({
-      x1: FLOW.pad + axis,
-      y1: bodyY + body.h,
-      x2: FLOW.pad + axis,
-      y2: chipY,
-      kind: "add",
-    });
+    if (!body.terminal) {
+      edges.push({
+        x1: FLOW.pad + axis,
+        y1: bodyY + body.h,
+        x2: FLOW.pad + axis,
+        y2: chipY,
+        kind: "add",
+      });
+    }
 
     width = Math.max(width, FLOW.pad + axis - body.inX + body.w + FLOW.pad);
     cursorY = chipY + chip.h + FLOW.bandGap;
