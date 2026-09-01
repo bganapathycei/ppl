@@ -28,6 +28,10 @@
       </label>
       <button type="button" id="btn-validate" title="Parse and compile">Validate</button>
       <button type="button" id="btn-run" class="primary" title="Run with the PPL runtime">Run</button>
+      <div class="view-toggle" role="group" aria-label="Editor view">
+        <button type="button" id="view-flow" class="seg active" title="Flowchart view">Flow</button>
+        <button type="button" id="view-blocks" class="seg" title="Nested block view">Blocks</button>
+      </div>
     </div>
     <div id="status" class="status" role="status">Ready</div>
     <input id="open-file" type="file" accept=".ppl,text/plain" hidden>
@@ -35,11 +39,22 @@
 
   <main class="workspace">
     <aside id="palette" class="palette" aria-label="PPL constructs"></aside>
-    <section class="canvas-wrap">
+    <section class="canvas-wrap" data-view="flow">
       <div id="issues" class="issues" hidden></div>
+      <div id="flow" class="flow" aria-label="Program flow canvas"></div>
+      <div class="flow-tools" aria-label="Canvas controls">
+        <button type="button" id="flow-fit" title="Fit to view">Fit</button>
+        <button type="button" id="flow-zoom-out" title="Zoom out">−</button>
+        <button type="button" id="flow-zoom-in" title="Zoom in">+</button>
+        <span class="flow-hint">Select a node to edit · pick a palette block then click “+” to add</span>
+      </div>
       <div id="canvas" class="canvas" aria-label="Program canvas"></div>
     </section>
-    <aside class="inspector" aria-label="Source and graph">
+    <aside class="inspector" aria-label="Properties, source and graph">
+      <div class="inspector-pane props-pane">
+        <h2>Properties</h2>
+        <div id="props" class="props"></div>
+      </div>
       <div class="inspector-pane source-pane">
         <h2>Source</h2>
         <pre id="source" class="source"></pre>

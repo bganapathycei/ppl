@@ -1,11 +1,15 @@
 import { renderPalette } from "./palette.js";
 import { bindCanvas, renderCanvas } from "./canvas.js";
+import { renderFlow, bindFlow, fitFlow, zoomFlow } from "./flow.js";
+import { renderInspector, bindInspector } from "./inspector.js";
 import { generatePpl, appName } from "./codegen.js";
 import { parsePpl } from "./parse.js";
 import { compileProgram, fallbackGraph } from "./compile.js";
 import { renderGraph } from "./graph.js";
 import { validate } from "./validate.js";
-import { helloWorldDocument } from "./model.js";
+import { accepts } from "./schema.js";
+import { createNode, getNode, insertNode, getSlot, helloWorldDocument } from "./model.js";
+import { selectedKind, clearSelectedKind } from "./dnd.js";
 import { loadExampleSource } from "./templates.js";
 import { formatResult, runProgram } from "./run.js";
 import { renderTrace } from "./results.js";
@@ -17,6 +21,9 @@ const INPUT_KEY = "ppl-editor-input-v1";
 const els = {
   palette: document.getElementById("palette"),
   canvas: document.getElementById("canvas"),
+  canvasWrap: document.querySelector(".canvas-wrap"),
+  flow: document.getElementById("flow"),
+  props: document.getElementById("props"),
   source: document.getElementById("source"),
   graph: document.getElementById("graph"),
   graphMeta: document.getElementById("graph-meta"),
@@ -38,6 +45,8 @@ let lastDefaultInput = null;
 let inputDirty = Boolean(loadInputText());
 let lastExecutionId = null;
 let lastWaitOptions = [];
+let viewMode = "flow";
+let selectedId = null;
 
 function loadStored() {
   try {
@@ -103,6 +112,57 @@ function refreshCanvas() {
   renderCanvas(els.canvas, program);
 }
 
+function refreshFlow() {
+  renderFlow(els.flow, program, selectedId);
+}
+
+const inspectorHandlers = {
+  onEdit: () => {
+    refreshFlow();
+    refreshSourceAndGraph();
+  },
+  onStructure: (nextSelected) => {
+    selectedId = nextSelected;
+    refreshProps();
+    refreshFlow();
+    refreshCanvas();
+    refreshSourceAndGraph();
+  },
+};
+
+function refreshProps() {
+  renderInspector(els.props, program, selectedId, inspectorHandlers);
+}
+
+function setSelected(id) {
+  selectedId = id;
+  refreshFlow();
+  refreshProps();
+}
+
+function addFromPalette(ownerId, slot, index) {
+  const kind = selectedKind;
+  if (!kind) {
+    setStatus("Pick a palette block first, then click “+”.", "warn");
+    return;
+  }
+  const parent = getNode(program, ownerId);
+  if (!parent || !accepts(parent, slot, kind)) {
+    setStatus(`Can’t add ${kind} here.`, "warn");
+    return;
+  }
+  const list = getSlot(parent, slot) || [];
+  const node = createNode(kind);
+  insertNode(parent, slot, Math.min(index, list.length), node);
+  clearSelectedKind();
+  document.querySelectorAll(".palette-item.selected").forEach((el) => el.classList.remove("selected"));
+  selectedId = node.id;
+  refreshProps();
+  refreshCanvas();
+  refreshFlow();
+  refreshSourceAndGraph();
+}
+
 function maybeFillDefaultInput(defaultInput) {
   lastDefaultInput = defaultInput;
   if (inputDirty || !defaultInput) return;
@@ -151,9 +211,12 @@ function loadDocument(next) {
   inputDirty = false;
   lastExecutionId = null;
   lastWaitOptions = [];
+  selectedId = null;
   hideHumanActions();
   persist();
   refreshCanvas();
+  refreshFlow();
+  refreshProps();
   refreshSourceAndGraph();
 }
 
@@ -302,17 +365,49 @@ if (loadInputText()) {
 
 renderPalette(els.palette);
 bindCanvas(els.canvas, () => program, {
-  onEdit: refreshSourceAndGraph,
+  onEdit: () => {
+    refreshFlow();
+    refreshSourceAndGraph();
+  },
   onStructure: () => {
     refreshCanvas();
+    refreshFlow();
+    refreshProps();
     refreshSourceAndGraph();
   },
 });
+
+bindFlow(els.flow, () => program, {
+  onSelect: (id) => setSelected(id),
+  onAdd: (ownerId, slot, index) => addFromPalette(ownerId, slot, index),
+});
+bindInspector(els.props, () => program, () => selectedId, inspectorHandlers);
+
+function setView(mode) {
+  viewMode = mode;
+  els.canvasWrap.dataset.view = mode;
+  document.body.dataset.view = mode;
+  document.getElementById("view-flow").classList.toggle("active", mode === "flow");
+  document.getElementById("view-blocks").classList.toggle("active", mode === "blocks");
+  if (mode === "flow") refreshFlow();
+  else refreshCanvas();
+}
+
+document.getElementById("view-flow").addEventListener("click", () => setView("flow"));
+document.getElementById("view-blocks").addEventListener("click", () => setView("blocks"));
+document.getElementById("flow-fit").addEventListener("click", () => fitFlow(els.flow));
+document.getElementById("flow-zoom-in").addEventListener("click", () => zoomFlow(els.flow, 1.15));
+document.getElementById("flow-zoom-out").addEventListener("click", () => zoomFlow(els.flow, 0.87));
+
 initAssistant(els.assistant, {
   getSource: () => generatePpl(program),
   applySource: (text) => openText(text),
   onStatus: setStatus,
 });
 
+document.body.dataset.view = viewMode;
 refreshCanvas();
+refreshFlow();
+refreshProps();
 refreshSourceAndGraph();
+requestAnimationFrame(() => fitFlow(els.flow));
