@@ -1,0 +1,24 @@
+{
+  "name": "ppl-flow-editor",
+  "version": "1.0.0",
+  "description": "React Flow visual editor for PPL programs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node tests/ast_to_flow.test.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
+    "@xyflow/react": "^12.11.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.2.2"
+  }
+}

@@ -27,7 +27,7 @@ const TONE_OF = {
   ent: "ent",
 };
 
-function tone(kind) {
+export function tone(kind) {
   return TONE_OF[BLOCKS[kind]?.tone] || "det";
 }
 
@@ -43,7 +43,7 @@ function conditionText(node) {
 }
 
 // Primary + secondary lines shown inside a flow node.
-function summarize(node) {
+export function summarize(node) {
   switch (node.kind) {
     case "app":
       return [node.name || "MyApplication"];
