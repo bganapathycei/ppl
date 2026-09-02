@@ -1,0 +1,13 @@
+APP LogFilter
+
+INPUT filter
+    source: TEXT
+    target: TEXT
+
+WORKFLOW Main
+
+    RECEIVE filter
+    READ filter.source INTO content
+    WRITE filter.target FROM content
+    PRINT "copied"
+    RETURN "ok"

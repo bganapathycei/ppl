@@ -124,10 +124,63 @@ class Condition:
 
 
 @dataclass
+class LetStep:
+    name: str
+    expr: str
+
+
+@dataclass
+class PrintStep:
+    expr: str
+
+
+@dataclass
+class ReadStep:
+    path: str
+    var: str
+
+
+@dataclass
+class WriteStep:
+    path: str
+    expr: str
+
+
+@dataclass
+class ForStep:
+    item: str
+    source: str
+    body: list[Any] = field(default_factory=list)
+
+
+@dataclass
+class WhileStep:
+    condition: str
+    body: list[Any] = field(default_factory=list)
+
+
+@dataclass
+class PromptDecl:
+    name: str
+    body: list[str] = field(default_factory=list)
+
+
+@dataclass
+class PromptUseOp:
+    template: str
+    bindings: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class ImportDecl:
+    module: str
+
+
+@dataclass
 class IfStep:
-    condition: Condition
+    condition: Condition | str
     then_steps: list[Any] = field(default_factory=list)
-    else_if: list[tuple[Condition, list[Any]]] = field(default_factory=list)
+    else_if: list[tuple[Condition | str, list[Any]]] = field(default_factory=list)
     else_steps: list[Any] = field(default_factory=list)
 
 
@@ -177,7 +230,9 @@ class AppDecl:
 @dataclass
 class Program:
     app: AppDecl | None = None
+    imports: list[ImportDecl] = field(default_factory=list)
     inputs: list[InputDecl] = field(default_factory=list)
+    prompts: list[PromptDecl] = field(default_factory=list)
     model_policies: list[ModelPolicyDecl] = field(default_factory=list)
     guards: list[GuardDecl] = field(default_factory=list)
     authorizations: list[AuthorizationDecl] = field(default_factory=list)

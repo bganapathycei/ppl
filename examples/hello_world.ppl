@@ -1,23 +1,6 @@
-APP HelloAI
-
-INPUT request
-    text: TEXT
-
-AGENT Classifier
-
-    INPUT request
-
-    CLASSIFY request.text AS
-        GREETING
-        QUESTION
-        OTHER
-
-    OUTPUT
-        category
-        confidence
+APP Hello
 
 WORKFLOW Main
-
-    RECEIVE request
-    RUN Classifier
-    RETURN Classifier.category
+    LET message = "Hello, world"
+    PRINT message
+    RETURN message

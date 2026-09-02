@@ -335,6 +335,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 .pf-kw.tone-gov { border-left-color: var(--gov); }
 .pf-kw.tone-ent { border-left-color: var(--ent); }
 .pf-remove { margin-left: auto; background: var(--issue-error-bg); border: 1px solid var(--issue-error-border); color: var(--issue-error-text); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+.pf-actions { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pf-remove-footer { margin-left: 0; width: 100%; padding: 7px 10px; font-weight: 600; }
 
 .pf-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
 .pf-row > span { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }

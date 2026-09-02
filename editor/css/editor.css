@@ -120,6 +120,20 @@ button, select, input, textarea {
   flex-shrink: 0;
 }
 
+.provider-badge {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.provider-badge.provider-live {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
 .toolbar-end .status {
   margin-left: 0;
   max-width: 280px;
@@ -210,6 +224,13 @@ button, select, input, textarea {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: var(--muted);
+}
+
+.palette-hint {
+  margin: 0 8px 10px;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--muted);
 }
 
@@ -549,6 +570,14 @@ body[data-view="blocks"] .props-pane { display: none; }
 
 .flow-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-surface); }
 
+.flow-add.flow-drop-over,
+.flow-node.flow-drop-over {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-surface);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .flow-tools {
   position: absolute;
   right: 14px;
@@ -632,6 +661,19 @@ body[data-view="blocks"] .props-pane { display: none; }
 }
 
 .insp-remove:hover { background: var(--insp-remove-hover); }
+
+.insp-actions {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.insp-remove-footer {
+  margin-left: 0;
+  width: 100%;
+  padding: 7px 10px;
+  font-weight: 600;
+}
 
 .insp-row {
   display: flex;

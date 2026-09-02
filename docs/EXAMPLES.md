@@ -18,7 +18,17 @@ Every section shows:
 
 ---
 
-## 1. Hello AI — `examples/hello_world.ppl`
+## 1. Hello world — `examples/hello_world.ppl`
+
+Deterministic script (no API key):
+
+```bash
+ppl run examples/hello_world.ppl --stdio
+```
+
+**Output:** prints `Hello, world` and returns `"Hello, world"`.
+
+## 2. Hello AI — `examples/hello_world_ai.ppl`
 
 **Teaches:** `APP`, `INPUT`, `AGENT`, `CLASSIFY`, `WORKFLOW`, `RETURN` field paths.
 

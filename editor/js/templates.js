@@ -1,5 +1,12 @@
 export const EXAMPLES = {
-  hello_world: `APP HelloAI
+  hello_world: `APP Hello
+
+WORKFLOW Main
+    LET message = "Hello, world"
+    PRINT message
+    RETURN message
+`,
+  hello_world_ai: `APP HelloAI
 
 INPUT request
     text: TEXT
@@ -22,6 +29,19 @@ WORKFLOW Main
     RECEIVE request
     RUN Classifier
     RETURN Classifier.category
+`,
+  calculator: `APP Calculator
+
+INPUT calc
+    a: NUMBER
+    b: NUMBER
+
+WORKFLOW Main
+
+    RECEIVE calc
+    LET result = calc.a + calc.b
+    PRINT result
+    RETURN result
 `,
   incident: `APP IncidentAdvisor
 

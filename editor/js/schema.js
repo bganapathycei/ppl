@@ -13,7 +13,9 @@ export const OPERATORS = [">=", "<=", "==", "!=", ">", "<"];
 
 export const TOP_LEVEL = [
   "app",
+  "import",
   "input",
+  "prompt",
   "model_policy",
   "guard",
   "authorization",
@@ -29,6 +31,12 @@ export const TOP_LEVEL = [
 export const WORKFLOW_STEPS = [
   "receive",
   "run",
+  "let",
+  "print",
+  "read",
+  "write",
+  "for",
+  "while",
   "if",
   "return",
   "human_approval",
@@ -248,6 +256,61 @@ export const BLOCKS = {
     tone: "det",
     fields: [{ prop: "name", kind: "text", placeholder: "agent", grow: true }],
   },
+  let: {
+    keyword: "LET",
+    tone: "det",
+    fields: [
+      { prop: "name", kind: "text", placeholder: "variable" },
+      { prop: "expr", kind: "text", placeholder: "expression", grow: true },
+    ],
+  },
+  print: {
+    keyword: "PRINT",
+    tone: "det",
+    fields: [{ prop: "expr", kind: "text", placeholder: "expression", grow: true }],
+  },
+  read: {
+    keyword: "READ",
+    tone: "det",
+    fields: [
+      { prop: "path", kind: "text", placeholder: "path" },
+      { prop: "var", kind: "text", placeholder: "variable" },
+    ],
+  },
+  write: {
+    keyword: "WRITE",
+    tone: "det",
+    fields: [
+      { prop: "path", kind: "text", placeholder: "path" },
+      { prop: "expr", kind: "text", placeholder: "expression", grow: true },
+    ],
+  },
+  for: {
+    keyword: "FOR",
+    tone: "det",
+    fields: [
+      { prop: "item", kind: "text", placeholder: "item" },
+      { prop: "source", kind: "text", placeholder: "list expr" },
+    ],
+    slots: [{ name: "children", label: "Body", accept: WORKFLOW_STEPS }],
+  },
+  while: {
+    keyword: "WHILE",
+    tone: "det",
+    fields: [{ prop: "condition", kind: "text", placeholder: "condition DO", grow: true }],
+    slots: [{ name: "children", label: "Body", accept: WORKFLOW_STEPS }],
+  },
+  import: {
+    keyword: "IMPORT",
+    tone: "app",
+    fields: [{ prop: "module", kind: "text", placeholder: "stdlib.files", grow: true }],
+  },
+  prompt: {
+    keyword: "PROMPT",
+    tone: "cog",
+    fields: [{ prop: "name", kind: "text", placeholder: "name", grow: true }],
+    slots: [{ name: "children", label: "Template", accept: ["rule"] }],
+  },
   if: {
     keyword: "IF",
     tone: "det",
@@ -331,7 +394,7 @@ export const PALETTE_GROUPS = [
   {
     id: "application",
     title: "Application",
-    kinds: ["app", "input", "field", "model_policy"],
+    kinds: ["app", "import", "input", "field", "prompt", "model_policy"],
   },
   {
     id: "cognitive",
@@ -357,6 +420,12 @@ export const PALETTE_GROUPS = [
       "workflow",
       "receive",
       "run",
+      "let",
+      "print",
+      "read",
+      "write",
+      "for",
+      "while",
       "if",
       "else_if",
       "return",

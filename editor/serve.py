@@ -144,6 +144,10 @@ class EditorHandler(SimpleHTTPRequestHandler):
         if path == "/api/assistant/config":
             self._send_json(200, assistant_config())
             return
+        if path == "/api/provider":
+            from ppl.provider import public_config
+            self._send_json(200, {"ok": True, **public_config()})
+            return
         if path == "/flow":
             self.send_response(301)
             self.send_header("Location", "/flow/")

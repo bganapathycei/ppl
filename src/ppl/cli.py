@@ -9,7 +9,7 @@ from .compiler import Compiler
 from .dx import diagnostics_from_exception, format_ppl, init_project
 from .execution_graph import ExecutionStatus
 from .parser import parse
-from .provider import build_adapter
+from .provider import build_adapter, public_config, test_provider, SUPPORTED, apply_program_environment
 from .runtime import Runtime, approve_execution
 from .store import FileExecutionStore, default_state_dir
 from .test_runner import discover_tests, run_test_module
@@ -19,11 +19,32 @@ def load(path):
     return Path(path).read_text(encoding="utf-8")
 
 
-def build_gateway():
+def build_gateway(pir: dict | None = None):
     try:
+        if pir is not None:
+            apply_program_environment(pir.get("environments"))
         return AIGateway(build_adapter())
     except (ValueError, RuntimeError) as exc:
         raise SystemExit(str(exc)) from exc
+
+
+def cmd_provider(args):
+    if args.provider_command == "list":
+        print("Supported providers:")
+        for name in SUPPORTED:
+            print(f"  - {name}")
+        return
+    if args.provider_command == "show":
+        print(json.dumps(public_config(), indent=2))
+        return
+    if args.provider_command == "test":
+        try:
+            result = test_provider()
+            print(json.dumps(result, indent=2))
+        except Exception as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+            raise SystemExit(1) from exc
+        return
 
 
 def default_input(pir):
@@ -159,6 +180,7 @@ def cmd_run_program(args, pir, *, trace: bool = False):
     store = _store_from_args(args)
     workers = int(getattr(args, "workers", 0) or 0)
     execution_id = getattr(args, "execution_id", None)
+    stdio = bool(getattr(args, "stdio", False))
 
     if workers > 0:
         from .workers import run_with_workers
@@ -170,7 +192,7 @@ def cmd_run_program(args, pir, *, trace: bool = False):
             store=store,
             execution_id=execution_id,
         )
-        runtime = Runtime(pir, gateway=build_gateway(), store=store, program_path=args.file)
+        runtime = Runtime(pir, gateway=build_gateway(pir), store=store, program_path=args.file)
         if isinstance(result, dict) and result.get("status") == "WAITING":
             runtime.execution = store.load(result["execution_id"])
         elif execution_id and store.exists(execution_id):
@@ -182,16 +204,24 @@ def cmd_run_program(args, pir, *, trace: bool = False):
                 runtime.execution = store.load(eid)
         if trace:
             print_trace(pir, runtime, result)
+        elif stdio and runtime.prints:
+            for line in runtime.prints:
+                print(line)
         else:
             print(json.dumps(result, indent=2))
         if isinstance(result, dict) and result.get("status") == "WAITING":
             raise SystemExit(2)
         return
 
-    runtime = Runtime(pir, gateway=build_gateway(), store=store, program_path=args.file)
+    runtime = Runtime(pir, gateway=build_gateway(pir), store=store, program_path=args.file)
     result = runtime.run(input_data, execution_id=execution_id)
     if trace:
         print_trace(pir, runtime, result)
+    elif stdio and runtime.prints:
+        for line in runtime.prints:
+            print(line)
+        if runtime.return_value is not None and not runtime.prints:
+            print(runtime.return_value)
     else:
         print(json.dumps(result, indent=2))
     if isinstance(result, dict) and result.get("status") == "WAITING":
@@ -205,7 +235,7 @@ def cmd_resume(args):
     if not program_path:
         raise SystemExit("Execution has no program_path; pass the .ppl file as --file")
     pir = compile_file(program_path)
-    runtime = Runtime(pir, gateway=build_gateway(), store=store, program_path=program_path)
+    runtime = Runtime(pir, gateway=build_gateway(pir), store=store, program_path=program_path)
     result = runtime.run(execution_id=args.execution_id, resume=True)
     print(json.dumps(result, indent=2))
     if isinstance(result, dict) and result.get("status") == "WAITING":
@@ -250,6 +280,8 @@ def main():
     for cmd in ("check", "compile"):
         p = sub.add_parser(cmd)
         p.add_argument("file")
+        if cmd == "check":
+            p.add_argument("--strict", action="store_true", help="Warn when cognitive nodes use local provider")
 
     for cmd in ("run", "trace"):
         p = sub.add_parser(cmd)
@@ -258,6 +290,13 @@ def main():
         p.add_argument("--execution-id", default=None)
         p.add_argument("--workers", type=int, default=0)
         p.add_argument("--store", default=None)
+        p.add_argument("--stdio", action="store_true", help="Print PRINT output instead of JSON")
+
+    provider = sub.add_parser("provider")
+    provider_sub = provider.add_subparsers(dest="provider_command", required=True)
+    provider_sub.add_parser("show")
+    provider_sub.add_parser("test")
+    provider_sub.add_parser("list")
 
     resume = sub.add_parser("resume")
     resume.add_argument("execution_id")
@@ -316,6 +355,9 @@ def main():
     if args.command == "worker":
         cmd_worker(args)
         return
+    if args.command == "provider":
+        cmd_provider(args)
+        return
 
     try:
         pir = compile_file(args.file)
@@ -331,6 +373,11 @@ def main():
         print("Agents               OK")
         print("Workflows            OK")
         print("Graph                OK")
+        if getattr(args, "strict", False):
+            cfg = public_config()
+            has_cognitive = any(a.get("operations") for a in pir.get("agents", []))
+            if has_cognitive and cfg.get("provider") in {"local", "mock", ""}:
+                print("Warning              Cognitive nodes with local provider")
         print("Program is valid.")
         return
 

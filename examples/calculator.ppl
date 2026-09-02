@@ -1,0 +1,12 @@
+APP Calculator
+
+INPUT calc
+    a: NUMBER
+    b: NUMBER
+
+WORKFLOW Main
+
+    RECEIVE calc
+    LET result = calc.a + calc.b
+    PRINT result
+    RETURN result

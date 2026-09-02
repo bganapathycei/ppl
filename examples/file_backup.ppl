@@ -1,0 +1,13 @@
+APP FileBackup
+
+INPUT backup
+    source: TEXT
+    target: TEXT
+
+WORKFLOW Main
+
+    RECEIVE backup
+    READ backup.source INTO content
+    WRITE backup.target FROM content
+    PRINT "backup complete"
+    RETURN "ok"

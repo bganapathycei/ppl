@@ -32,6 +32,8 @@
         <select id="example-select">
           <option value="">Load example…</option>
           <option value="hello_world">hello_world</option>
+          <option value="hello_world_ai">hello_world_ai</option>
+          <option value="calculator">calculator</option>
           <option value="incident">incident</option>
           <option value="governed_change">governed_change</option>
           <option value="enterprise_automation">enterprise_automation</option>
@@ -45,6 +47,7 @@
       </div>
     </div>
     <div class="toolbar-end">
+      <div id="provider-badge" class="provider-badge" title="LLM provider">Provider: …</div>
       <div id="status" class="status" role="status">Ready</div>
       <button type="button" id="theme-toggle" class="theme-toggle" data-theme-toggle aria-pressed="false" title="Switch to light theme">
         <span class="theme-toggle-icon" aria-hidden="true">☾</span>
@@ -63,7 +66,7 @@
         <button type="button" id="flow-fit" title="Fit to view">Fit</button>
         <button type="button" id="flow-zoom-out" title="Zoom out">−</button>
         <button type="button" id="flow-zoom-in" title="Zoom in">+</button>
-        <span class="flow-hint">Select a node to edit · pick a palette block then click “+” to add</span>
+        <span class="flow-hint">Select a palette block → click “+ step”, drag onto it, or double-click the block</span>
       </div>
       <div id="canvas" class="canvas" aria-label="Program canvas"></div>
     </section>

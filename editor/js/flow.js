@@ -1,8 +1,9 @@
 // Interactive flow canvas: renders the auto-laid-out program as a pannable,
 // zoomable flowchart. The document (AST) stays the source of truth; this module
-// only reads it and reports intents (select / add) back to the host.
+// only reads it and reports intents (select / add / drop) back to the host.
 
 import { layoutProgram } from "./flow_layout.js";
+import { drag, endDrag } from "./dnd.js";
 
 const view = { tx: 24, ty: 20, scale: 1 };
 let stageEl = null;
@@ -161,6 +162,27 @@ function startInlineRename(target) {
   input.addEventListener("dblclick", (e) => e.stopPropagation());
 }
 
+function clearDropHighlights(root) {
+  root.querySelectorAll(".flow-drop-over").forEach((el) => el.classList.remove("flow-drop-over"));
+}
+
+function dropTargetFromEvent(event) {
+  const add = event.target.closest(".flow-add");
+  if (add) {
+    return {
+      ownerId: add.dataset.addOwner,
+      slot: add.dataset.addSlot || "children",
+      index: Number(add.dataset.addIndex),
+      el: add,
+    };
+  }
+  const workflowTitle = event.target.closest(".flow-node.role-workflow-title");
+  if (workflowTitle?.dataset.id) {
+    return { ownerId: workflowTitle.dataset.id, slot: "children", index: Infinity, el: workflowTitle };
+  }
+  return null;
+}
+
 export function bindFlow(container, getProgram, handlers) {
   flowHandlers = handlers;
 
@@ -187,6 +209,38 @@ export function bindFlow(container, getProgram, handlers) {
       return;
     }
     if (!event.target.closest(".flow-node, .flow-add, .flow-container")) handlers.onSelect(null);
+  });
+
+  container.addEventListener("dragover", (event) => {
+    const target = dropTargetFromEvent(event);
+    clearDropHighlights(container);
+    if (!target) return;
+    const hasKind =
+      (drag?.type === "kind" && drag.kind) ||
+      event.dataTransfer?.types?.includes("application/x-ppl-kind") ||
+      event.dataTransfer?.types?.includes("text/plain");
+    if (!hasKind) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    target.el.classList.add("flow-drop-over");
+  });
+
+  container.addEventListener("dragleave", (event) => {
+    if (!container.contains(event.relatedTarget)) clearDropHighlights(container);
+  });
+
+  container.addEventListener("drop", (event) => {
+    const target = dropTargetFromEvent(event);
+    clearDropHighlights(container);
+    if (!target) return;
+    event.preventDefault();
+    const kind =
+      (drag?.type === "kind" && drag.kind) ||
+      event.dataTransfer.getData("application/x-ppl-kind") ||
+      (event.dataTransfer.getData("text/plain") || "").replace(/^kind:/, "");
+    endDrag();
+    if (!kind) return;
+    handlers.onDrop?.(kind, target.ownerId, target.slot, target.index);
   });
 
   container.addEventListener("dblclick", (event) => {

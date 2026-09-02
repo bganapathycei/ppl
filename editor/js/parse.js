@@ -34,7 +34,11 @@ class Parser {
       if (line.startsWith("APP ")) {
         program.children.push(createNode("app", { name: line.slice(4).trim() }));
         this.i += 1;
-      } else if (line.startsWith("INPUT ")) program.children.push(this.parseInput());
+      } else if (line.startsWith("IMPORT ")) {
+        program.children.push(createNode("import", { module: line.slice(7).trim() }));
+        this.i += 1;
+      } else if (line.startsWith("PROMPT ")) program.children.push(this.parsePrompt());
+      else if (line.startsWith("INPUT ")) program.children.push(this.parseInput());
       else if (line.startsWith("MODEL_POLICY ")) program.children.push(this.parsePolicy());
       else if (line.startsWith("GUARD ")) program.children.push(this.parseGuard());
       else if (line.startsWith("AUTHORIZATION ")) program.children.push(this.parseAuthorization());
@@ -48,6 +52,18 @@ class Parser {
       else this.error(`Unexpected line: ${line}`);
     }
     return program;
+  }
+
+  parsePrompt() {
+    const parent = this.peek().indent;
+    const name = this.peek().line.slice("PROMPT ".length).trim();
+    this.i += 1;
+    const children = [];
+    while (this.peek() && this.peek().indent > parent) {
+      children.push(createNode("rule", { text: this.peek().line }));
+      this.i += 1;
+    }
+    return createNode("prompt", { name, children });
   }
 
   parseInput() {
@@ -315,7 +331,35 @@ class Parser {
     const steps = [];
     while (this.peek() && this.peek().indent > parentIndent) {
       const { indent, line } = this.peek();
-      if (line.startsWith("RECEIVE ")) {
+      if (line.startsWith("LET ")) {
+        const rest = line.slice(4).trim();
+        const [name, expr] = splitOnce(rest, "=");
+        steps.push(createNode("let", { name: name.trim(), expr: (expr || "").trim() }));
+        this.i += 1;
+      } else if (line.startsWith("PRINT ")) {
+        steps.push(createNode("print", { expr: line.slice(6).trim() }));
+        this.i += 1;
+      } else if (line.startsWith("READ ")) {
+        const m = line.slice(5).trim().match(/^(.+?)\s+INTO\s+(.+)$/i);
+        if (!m) this.error(`READ requires path INTO var: ${line}`);
+        steps.push(createNode("read", { path: m[1].trim(), var: m[2].trim() }));
+        this.i += 1;
+      } else if (line.startsWith("WRITE ")) {
+        const m = line.slice(6).trim().match(/^(.+?)\s+FROM\s+(.+)$/i);
+        if (!m) this.error(`WRITE requires path FROM expr: ${line}`);
+        steps.push(createNode("write", { path: m[1].trim(), expr: m[2].trim() }));
+        this.i += 1;
+      } else if (line.startsWith("FOR ")) {
+        const m = line.slice(4).trim().match(/^(.+?)\s+IN\s+(.+?)\s+DO$/i);
+        if (!m) this.error(`FOR requires item IN source DO: ${line}`);
+        this.i += 1;
+        steps.push(createNode("for", { item: m[1].trim(), source: m[2].trim(), children: this.parseSteps(indent) }));
+      } else if (line.startsWith("WHILE ")) {
+        const rest = line.slice(6).trim();
+        if (!rest.toUpperCase().endsWith(" DO")) this.error(`WHILE requires trailing DO: ${line}`);
+        this.i += 1;
+        steps.push(createNode("while", { condition: rest.slice(0, -2).trim(), children: this.parseSteps(indent) }));
+      } else if (line.startsWith("RECEIVE ")) {
         steps.push(createNode("receive", { name: line.slice(8).trim() }));
         this.i += 1;
       } else if (line.startsWith("RUN ")) {

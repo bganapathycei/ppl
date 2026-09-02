@@ -35,9 +35,24 @@ def test_incident_program():
 
 def test_hello_world_resolves_return():
     runtime, result = run_example("hello_world.ppl")
+    assert result == "Hello, world"
+    assert runtime.prints == ["Hello, world"]
+
+
+def test_hello_world_ai_resolves_return():
+    runtime, result = run_example("hello_world_ai.ppl")
     assert result in {"GREETING", "QUESTION", "OTHER"}
     assert result != "Classifier.category"
     assert "Classifier" in runtime.context
+
+
+def test_calculator_runs():
+    runtime, result = run_example(
+        "calculator.ppl",
+        {"calc": {"a": 4, "b": 5}},
+    )
+    assert result == 9
+    assert runtime.prints == ["9"]
 
 
 def test_governed_change_parses_and_runs():
@@ -133,7 +148,7 @@ def test_cli_check(capsys, monkeypatch):
     from ppl.cli import main
     main()
     out = capsys.readouterr().out
-    assert "PPL Compiler 0.10.0" in out
+    assert "PPL Compiler 0.11.0" in out
     assert "Program is valid." in out
 
 

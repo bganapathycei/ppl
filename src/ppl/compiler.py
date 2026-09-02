@@ -1,5 +1,12 @@
 from .ast import *
 from .execution_graph import ExecutionGraph, GraphNode
+from .expr import parse_expr
+
+
+def _serialize_condition(condition):
+    if isinstance(condition, Condition):
+        return {"type": "simple", **vars(condition)}
+    return {"type": "expr", "expr": parse_expr(condition).to_dict(), "text": condition}
 
 
 def _schema_from_outputs(outputs):
@@ -39,8 +46,10 @@ class Compiler:
                 for node in graph["nodes"]
             ])
         return {
-            "version": "0.9",
+            "version": "0.11",
             "application": program.app.name,
+            "imports": [i.module for i in program.imports],
+            "prompts": [{"name": p.name, "body": p.body} for p in program.prompts],
             "inputs": [
                 {"name": x.name, "fields": [{"name": f.name, "type": f.type_name} for f in x.fields]}
                 for x in program.inputs
@@ -65,7 +74,14 @@ class Compiler:
         output_schema = _schema_from_outputs(a.outputs)
         ops = []
         for op in a.operations:
-            if isinstance(op, ClassifyOp):
+            if isinstance(op, PromptUseOp):
+                ops.append({
+                    "operation": "PROMPT",
+                    "execution_type": "C",
+                    "template": op.template,
+                    "bindings": op.bindings,
+                })
+            elif isinstance(op, ClassifyOp):
                 ops.append({
                     "operation": "CLASSIFY",
                     "execution_type": "C",
@@ -103,20 +119,84 @@ class Compiler:
         return {"name": w.name, "steps": [self.compile_step(s) for s in w.steps]}
 
     def compile_step(self, s):
+        if isinstance(s, LetStep):
+            return {
+                "operation": "LET",
+                "execution_type": "D",
+                "name": s.name,
+                "expr": parse_expr(s.expr).to_dict(),
+                "expr_text": s.expr,
+            }
+        if isinstance(s, PrintStep):
+            return {
+                "operation": "PRINT",
+                "execution_type": "D",
+                "expr": parse_expr(s.expr).to_dict(),
+                "expr_text": s.expr,
+                "side_effect": True,
+            }
+        if isinstance(s, ReadStep):
+            return {
+                "operation": "READ",
+                "execution_type": "D",
+                "path": s.path,
+                "var": s.var,
+                "side_effect": True,
+            }
+        if isinstance(s, WriteStep):
+            return {
+                "operation": "WRITE",
+                "execution_type": "D",
+                "path": s.path,
+                "expr": parse_expr(s.expr).to_dict(),
+                "expr_text": s.expr,
+                "side_effect": True,
+            }
+        if isinstance(s, ForStep):
+            return {
+                "operation": "FOR",
+                "execution_type": "D",
+                "item": s.item,
+                "source": s.source,
+                "body": [self.compile_step(x) for x in s.body],
+            }
+        if isinstance(s, WhileStep):
+            return {
+                "operation": "WHILE",
+                "execution_type": "D",
+                "condition": parse_expr(s.condition).to_dict(),
+                "condition_text": s.condition,
+                "body": [self.compile_step(x) for x in s.body],
+            }
         if isinstance(s, ReceiveStep):
             return {"operation": "RECEIVE", "execution_type": "D", "name": s.name}
         if isinstance(s, RunStep):
             return {"operation": "RUN", "execution_type": "D", "name": s.name}
         if isinstance(s, ReturnStep):
+            if s.literal:
+                return {"operation": "RETURN", "execution_type": "D", "value": s.value, "literal": True}
+            if isinstance(s.value, str):
+                try:
+                    expr = parse_expr(s.value)
+                    return {
+                        "operation": "RETURN",
+                        "execution_type": "D",
+                        "value": expr.to_dict(),
+                        "literal": False,
+                        "expr": True,
+                        "expr_text": s.value,
+                    }
+                except SyntaxError:
+                    pass
             return {"operation": "RETURN", "execution_type": "D", "value": s.value, "literal": s.literal}
         if isinstance(s, IfStep):
             return {
                 "operation": "IF",
                 "execution_type": "D",
-                "condition": vars(s.condition),
+                "condition": _serialize_condition(s.condition),
                 "then": [self.compile_step(x) for x in s.then_steps],
                 "else_if": [
-                    {"condition": vars(c), "steps": [self.compile_step(x) for x in st]}
+                    {"condition": _serialize_condition(c), "steps": [self.compile_step(x) for x in st]}
                     for c, st in s.else_if
                 ],
                 "else": [self.compile_step(x) for x in s.else_steps],

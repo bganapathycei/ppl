@@ -102,6 +102,18 @@ export function summarize(node) {
       return [node.name || "request"];
     case "run":
       return [node.name || "Agent"];
+    case "let":
+      return [`${node.name || "x"} = ${truncate(node.expr, 28) || "0"}`];
+    case "print":
+      return [truncate(node.expr, 36) || '"…"'];
+    case "read":
+      return [`${node.path || "file"} → ${node.var || "var"}`];
+    case "write":
+      return [`${node.path || "file"} ← ${truncate(node.expr, 20) || "expr"}`];
+    case "for":
+      return [`${node.item || "item"} in ${truncate(node.source, 24) || "list"}`];
+    case "while":
+      return [truncate(node.condition, 36) || "condition"];
     case "return":
       return [node.literal ? JSON.stringify(String(node.value ?? "")) : (node.value ?? "").toString() || "value"];
     case "if":
@@ -122,6 +134,10 @@ export function summarize(node) {
         .map((a) => `${a.name || "arg"} = ${truncate(a.value, 16)}`);
       return [node.target || "Tool.action", ...args.slice(0, 4)];
     }
+    case "import":
+      return [node.module || "stdlib.files"];
+    case "prompt":
+      return [node.name || "Template", ...(node.children || []).map((r) => truncate(r.text, 34)).slice(0, 3)];
     default:
       return [node.name || node.kind];
   }
@@ -337,6 +353,50 @@ function measureParallel(node) {
 function measureStep(node) {
   if (node.kind === "if") return measureIf(node);
   if (node.kind === "parallel") return measureParallel(node);
+  if (node.kind === "for" || node.kind === "while") {
+    const header = makeBox(node);
+    const body = measureSequence(node.children, node.id, "children");
+    const chip = makeAddChip(node.id, "children", (node.children || []).length, "+ step");
+    // Stack header → body → add chip as a compact loop block.
+    const axis = Math.max(header.w / 2, body.inX, chip.w / 2);
+    const headerLayout = measureLeaf(header);
+    offset(headerLayout, axis - headerLayout.inX, 0);
+    offset(body, axis - body.inX, header.h + FLOW.vGap);
+    const chipY = header.h + FLOW.vGap + body.h + FLOW.vGap;
+    const items = [
+      ...headerLayout.items,
+      ...body.items,
+      { ...chip, x: axis - chip.w / 2, y: chipY },
+    ];
+    const edges = [
+      ...body.edges,
+      {
+        x1: axis,
+        y1: header.h,
+        x2: axis,
+        y2: header.h + FLOW.vGap,
+        kind: "flow",
+      },
+    ];
+    if (!body.terminal && body.items.length) {
+      edges.push({
+        x1: axis,
+        y1: header.h + FLOW.vGap + body.h,
+        x2: axis,
+        y2: chipY,
+        kind: "add",
+      });
+    }
+    return {
+      w: Math.max(header.w, body.w, chip.w),
+      h: chipY + chip.h,
+      inX: axis,
+      outX: axis,
+      terminal: false,
+      items,
+      edges,
+    };
+  }
   return measureLeaf(makeBox(node), node.kind === "return");
 }
 

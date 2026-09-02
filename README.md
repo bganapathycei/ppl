@@ -1,12 +1,16 @@
 # PPL — Prompt Programming Language
 
-PPL is an experimental AI-native programming language for expressing deterministic computation, AI reasoning, knowledge, tools, workflows, human decisions, governance, and distributed execution as executable software.
+PPL is a prompt programming language: write human-readable programs with deterministic control flow, optional AI reasoning, and durable orchestration. **The model is a worker—not the runtime.**
 
 > **The prompt is source code. The model is not the runtime.**
 
 PPL source is parsed into an AST, compiled into a portable Prompt Intermediate Representation (PIR), lowered into an execution graph, and run by a provider-neutral runtime with durable local state.
 
-## Current version: 0.10
+## Current version: 0.11
+
+PPL 0.11 adds a **deterministic daily-use layer**: `LET`, `PRINT`, `READ`, `WRITE`, `FOR`, `WHILE`, expression arithmetic/logic, expanded stdlib tools, `IMPORT stdlib.*`, and `PROMPT` templates. Programs can run without any LLM.
+
+Provider configuration is surfaced via `ppl provider show|test|list` and the visual editor provider badge. LLM setup uses `PPL_AI_PROVIDER` or `ppl.providers.json` (never embedded in `.ppl` source).
 
 PPL 0.10 adds a multi-provider LLM registry. `.ppl` source stays vendor-free. Live adapters: OpenAI-compatible Chat Completions (OpenAI, OpenRouter, Groq, Ollama), native Anthropic, native Google Gemini, plus optional OpenAI Responses.
 
@@ -44,10 +48,9 @@ Condensed path:
 
 1. Clone this repo and `cd` into it.
 2. Create a venv, then `python -m pip install -e .`
-3. `ppl check examples/hello_world.ppl` then `ppl run examples/hello_world.ppl` — expect `"GREETING"`.
-4. Work through Getting Started Steps 7–12, then [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
-5. Follow [`docs/EXAMPLES.md`](docs/EXAMPLES.md) for each sample’s **command → input → output** (`incident` → `"AUTOMATE"`, `governed_change` → `"APPROVED"`, `enterprise_automation` → `"DATABASE"`).
-6. Read [`docs/SPEC.md`](docs/SPEC.md) only after you have run programs.
+3. `ppl check examples/hello_world.ppl` then `ppl run examples/hello_world.ppl --stdio` — prints `Hello, world` (no API key).
+4. Configure a live model when needed: `ppl provider show` and [`wiki/Providers-and-LLM-Configuration.md`](wiki/Providers-and-LLM-Configuration.md).
+5. Work through Getting Started Steps 7–12, then [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 
 Doc index: [`docs/README.md`](docs/README.md). **GitHub Wiki:** [wiki](https://github.com/bganapathycei/ppl/wiki) (see [`wiki/`](wiki/) in repo).
 
@@ -58,10 +61,11 @@ Requires Python 3.10+. From the repository root (use a virtualenv; see Getting S
 ```bash
 python -m pip install -e .
 ppl check examples/hello_world.ppl
-ppl run examples/hello_world.ppl
+ppl run examples/hello_world.ppl --stdio
+ppl provider show
 ```
 
-If `ppl` is not on your PATH, use `python -m ppl` instead. `ppl check` prints `PPL Compiler 0.10.0`. `ppl run` on hello world returns `"GREETING"` with the default local adapter (no API key). Expected I/O for every bundled example: [`docs/EXAMPLES.md`](docs/EXAMPLES.md).
+If `ppl` is not on your PATH, use `python -m ppl` instead. `ppl run` on hello world prints `Hello, world` with no API key. For AI classification, use `examples/hello_world_ai.ppl`. Expected I/O for every bundled example: [`docs/EXAMPLES.md`](docs/EXAMPLES.md).
 
 ```bash
 ppl compile examples/hello_world.ppl

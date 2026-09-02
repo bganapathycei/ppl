@@ -56,6 +56,26 @@ function emitIf(node, level) {
 function emitStep(node, level) {
   const pad = indent(level);
   switch (node.kind) {
+    case "let":
+      return `${pad}LET ${node.name || "x"} = ${node.expr || "0"}`;
+    case "print":
+      return `${pad}PRINT ${node.expr || ""}`;
+    case "read":
+      return `${pad}READ ${node.path || "file.txt"} INTO ${node.var || "content"}`;
+    case "write":
+      return `${pad}WRITE ${node.path || "file.txt"} FROM ${node.expr || "content"}`;
+    case "for": {
+      const lines = [`${pad}FOR ${node.item || "item"} IN ${node.source || "items"} DO`];
+      const body = emitList(node.children, level + 1, emitStep);
+      if (body) lines.push(body);
+      return lines.join("\n");
+    }
+    case "while": {
+      const lines = [`${pad}WHILE ${node.condition || "TRUE"} DO`];
+      const body = emitList(node.children, level + 1, emitStep);
+      if (body) lines.push(body);
+      return lines.join("\n");
+    }
     case "receive":
       return `${pad}RECEIVE ${node.name || "request"}`;
     case "run":
@@ -118,6 +138,13 @@ function emitDecl(node) {
   switch (node.kind) {
     case "app":
       return `APP ${node.name || "MyApplication"}`;
+    case "import":
+      return `IMPORT ${node.module || "stdlib.files"}`;
+    case "prompt": {
+      const lines = [`PROMPT ${node.name || "Template"}`];
+      for (const rule of node.children || []) lines.push(`${indent(1)}${(rule.text || "").trim()}`);
+      return lines.join("\n");
+    }
     case "input": {
       const lines = [`INPUT ${node.name || "request"}`];
       for (const field of node.children || []) lines.push(`${indent(1)}${fieldLine(field)}`);

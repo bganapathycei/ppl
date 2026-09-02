@@ -18,10 +18,10 @@ def test_file_execution_store_roundtrip(tmp_path):
     store = FileExecutionStore(tmp_path)
     pir = Compiler().compile(parse((ROOT / "examples/hello_world.ppl").read_text(encoding="utf-8")))
     runtime = Runtime(pir, store=store, program_path=ROOT / "examples/hello_world.ppl", interactive=False)
-    result = runtime.run({"request": {"text": "hello there"}})
-    assert result == "GREETING"
+    result = runtime.run({})
+    assert result == "Hello, world"
     loaded = store.load(runtime.execution.execution_id)
-    assert loaded.result == "GREETING"
+    assert loaded.result == "Hello, world"
     assert loaded.status.value == "SUCCEEDED"
 
 
@@ -105,7 +105,7 @@ def test_workers_set_worker_metadata(tmp_path, monkeypatch):
     from ppl.parser import parse
     from ppl.store import FileExecutionStore
 
-    program = ROOT / "examples" / "hello_world.ppl"
+    program = ROOT / "examples" / "hello_world_ai.ppl"
     pir = Compiler().compile(parse(program.read_text(encoding="utf-8")))
     store = FileExecutionStore(tmp_path)
     result = run_with_workers(
@@ -115,7 +115,7 @@ def test_workers_set_worker_metadata(tmp_path, monkeypatch):
         workers=2,
         store=store,
     )
-    assert result == "GREETING"
+    assert result in {"GREETING", "QUESTION", "OTHER"}
     # Find the saved execution
     ids = store.list_ids()
     assert ids

@@ -80,7 +80,7 @@ function fieldRow(node, field, program) {
   return `<div class="insp-row"><label class="insp-label">${esc(label)}</label>${control(node, field, program)}</div>`;
 }
 
-function inlineSlot(node, spec) {
+function inlineSlot(node, spec, program) {
   const list = getSlot(node, spec.name) || [];
   const childKind = spec.accept[0];
   const childDef = BLOCKS[childKind] || {};
@@ -104,16 +104,16 @@ export function renderInspector(container, program, selectedId, handlers) {
     return;
   }
   const def = BLOCKS[node.kind] || {};
-  let html = `<div class="insp-title"><span class="insp-kw tone-${def.tone || "det"}">${esc(def.keyword || node.kind)}</span>`;
-  if (node.kind !== "app" && node.kind !== "program") {
-    html += `<button type="button" class="insp-remove" data-remove="${node.id}">Delete</button>`;
-  }
-  html += `</div>`;
+  const canDelete = node.kind !== "app" && node.kind !== "program";
+  let html = `<div class="insp-title">
+    <span class="insp-kw tone-${def.tone || "det"}">${esc(def.keyword || node.kind)}</span>
+    ${canDelete ? `<button type="button" class="insp-remove" data-remove="${esc(node.id)}" title="Delete this block">Delete</button>` : ""}
+  </div>`;
 
   for (const field of def.fields || []) html += fieldRow(node, field, program);
 
   for (const spec of def.slots || []) {
-    if ((spec.accept || []).every((k) => SIMPLE_KINDS.has(k))) html += inlineSlot(node, spec);
+    if ((spec.accept || []).every((k) => SIMPLE_KINDS.has(k))) html += inlineSlot(node, spec, program);
   }
 
   const complex = (def.slots || []).filter((spec) => !(spec.accept || []).every((k) => SIMPLE_KINDS.has(k)));

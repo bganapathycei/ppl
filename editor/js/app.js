@@ -1,4 +1,4 @@
-import { renderPalette } from "./palette.js";
+import { renderPalette, syncPaletteSelection } from "./palette.js";
 import { bindCanvas, renderCanvas } from "./canvas.js";
 import { renderFlow, bindFlow, fitFlow, zoomFlow, applyFlowDecorations } from "./flow.js";
 import { renderInspector, bindInspector } from "./inspector.js";
@@ -9,7 +9,8 @@ import { renderGraph, fitGraph, zoomGraph, bindGraph } from "./graph.js";
 import { validate, issuesByNodeId } from "./validate.js";
 import { accepts } from "./schema.js";
 import { createNode, getNode, insertNode, getSlot, helloWorldDocument, setProp } from "./model.js";
-import { selectedKind, clearSelectedKind } from "./dnd.js";
+import { selectedKind, clearSelectedKind, selectKind } from "./dnd.js";
+import { insertPaletteBlock } from "./paletteInsert.js";
 import { loadExampleSource } from "./templates.js";
 import { formatResult, runProgram } from "./run.js";
 import { renderTrace } from "./results.js";
@@ -40,6 +41,7 @@ const els = {
   runActions: document.getElementById("run-actions"),
   runHuman: document.getElementById("run-human"),
   assistant: document.getElementById("assistant"),
+  providerBadge: document.getElementById("provider-badge"),
 };
 
 let program = loadStored() || helloWorldDocument();
@@ -168,24 +170,61 @@ function setSelected(id) {
 function addFromPalette(ownerId, slot, index) {
   const kind = selectedKind;
   if (!kind) {
-    setStatus("Pick a palette block first, then click “+”.", "warn");
+    setStatus("Pick a palette block first, then click “+” — or drag a block onto “+ step”.", "warn");
     return;
   }
   const parent = getNode(program, ownerId);
-  if (!parent || !accepts(parent, slot, kind)) {
+  if (parent && accepts(parent, slot, kind)) {
+    const list = getSlot(parent, slot) || [];
+    const node = createNode(kind);
+    insertNode(parent, slot, Math.min(index ?? list.length, list.length), node);
+    finishInsert(node);
+    return;
+  }
+  // Fallback: resolve best insertion target (workflow / agent / top-level).
+  const node = insertPaletteBlock(program, kind, selectedId || ownerId);
+  if (!node) {
     setStatus(`Can’t add ${kind} here.`, "warn");
     return;
   }
-  const list = getSlot(parent, slot) || [];
-  const node = createNode(kind);
-  insertNode(parent, slot, Math.min(index, list.length), node);
+  finishInsert(node);
+}
+
+function insertKind(kind) {
+  if (!kind) return;
+  selectKind(kind);
+  const node = insertPaletteBlock(program, kind, selectedId);
+  if (!node) {
+    setStatus(`Can’t add ${kind} here. Select a WORKFLOW (or open its “+ step”).`, "warn");
+    syncPaletteSelection(els.palette);
+    return;
+  }
+  finishInsert(node);
+}
+
+function finishInsert(node) {
   clearSelectedKind();
-  document.querySelectorAll(".palette-item.selected").forEach((el) => el.classList.remove("selected"));
+  syncPaletteSelection(els.palette);
   selectedId = node.id;
   refreshProps();
   refreshCanvas();
   refreshFlow();
   refreshSourceAndGraph();
+  setStatus(`Added ${node.kind}`, "ok");
+}
+
+function dropOntoFlow(kind, ownerId, slot, index) {
+  selectKind(kind);
+  const parent = getNode(program, ownerId);
+  if (parent && accepts(parent, slot, kind)) {
+    const list = getSlot(parent, slot) || [];
+    const idx = Number.isFinite(index) ? Math.min(index, list.length) : list.length;
+    const node = createNode(kind);
+    insertNode(parent, slot, idx, node);
+    finishInsert(node);
+    return;
+  }
+  insertKind(kind);
 }
 
 function maybeFillDefaultInput(defaultInput) {
@@ -395,7 +434,25 @@ if (loadInputText()) {
   els.runInput.value = loadInputText();
 }
 
+async function refreshProviderBadge() {
+  if (!els.providerBadge) return;
+  try {
+    const resp = await fetch("/api/provider");
+    const data = await resp.json();
+    const label = data.provider || "local";
+    const model = data.model ? ` · ${data.model}` : "";
+    els.providerBadge.textContent = `Provider: ${label}${model}`;
+    els.providerBadge.title = data.api_key_set
+      ? "Live provider configured"
+      : "Local adapter (no API key). Set PPL_AI_PROVIDER for live models.";
+    els.providerBadge.classList.toggle("provider-live", label !== "local");
+  } catch {
+    els.providerBadge.textContent = "Provider: offline";
+  }
+}
+
 renderPalette(els.palette);
+refreshProviderBadge();
 bindCanvas(els.canvas, () => program, {
   onEdit: () => {
     refreshFlow();
@@ -412,6 +469,7 @@ bindCanvas(els.canvas, () => program, {
 bindFlow(els.flow, () => program, {
   onSelect: (id) => setSelected(id),
   onAdd: (ownerId, slot, index) => addFromPalette(ownerId, slot, index),
+  onDrop: (kind, ownerId, slot, index) => dropOntoFlow(kind, ownerId, slot, index),
   onToggleDecl: () => {
     collapsed.declarations = !collapsed.declarations;
     refreshFlow();
@@ -441,6 +499,11 @@ bindFlow(els.flow, () => program, {
     applyFlowDecorations(els.flow, { hoverAstId: null, refLinked: new Set() });
   },
 });
+
+els.palette.addEventListener("ppl-palette-insert", (event) => {
+  insertKind(event.detail?.kind);
+});
+
 bindInspector(els.props, () => program, () => selectedId, inspectorHandlers);
 
 function setView(mode) {

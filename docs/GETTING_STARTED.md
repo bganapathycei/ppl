@@ -2,11 +2,11 @@
 
 This is the new-developer walkthrough. Follow the steps in order. Each step says **what to do**, **what you should see**, and **what it means**.
 
-PPL (Prompt Programming Language) is an experimental AI-native language. You write `.ppl` source. The runtime compiles it, builds an execution graph, and runs that graph. A language model is a worker *behind* the graph — it is not the program.
+PPL (Prompt Programming Language) is a general prompt programming language. You write `.ppl` source with deterministic control flow (`LET`, `PRINT`, `IF`, file I/O, stdlib tools). AI reasoning is optional—configured at runtime, not in source.
 
 > **The prompt is source code. The model is not the runtime.**
 
-Current release: **0.10.0**. Python **3.10+**.
+Current release: **0.11.0**. Python **3.10+**.
 
 | If you want to… | Do this |
 |---|---|
@@ -40,8 +40,8 @@ You do **not** need an API key for Steps 1–14. The default `local` adapter is 
     -> execution graph
     -> FileExecutionStore  (.ppl/executions/)
          |
-         +-- deterministic  (IF, RETURN, CALL, PARALLEL, WAIT)
-         +-- cognitive      (CLASSIFY, EXTRACT, REASON) via PPL_AI_PROVIDER
+         +-- deterministic  (LET, PRINT, READ, WRITE, IF, RETURN, CALL, FOR, WHILE)
+         +-- cognitive      (CLASSIFY, EXTRACT, REASON, PROMPT) via PPL_AI_PROVIDER
          +-- human          (HUMAN_APPROVAL pause / ppl approve / resume)
 ```
 
@@ -49,9 +49,32 @@ You do **not** need an API key for Steps 1–14. The default `local` adapter is 
 
 Every operation is one of:
 
-- **D — Deterministic:** `IF`, `RETURN`, `CALL`, `PARALLEL`, `JOIN`, `WAIT`
-- **C — Cognitive:** `CLASSIFY`, `EXTRACT`, `REASON`
+- **D — Deterministic:** `LET`, `PRINT`, `READ`, `WRITE`, `IF`, `RETURN`, `CALL`, `FOR`, `WHILE`, `PARALLEL`, `JOIN`, `WAIT`
+- **C — Cognitive:** `CLASSIFY`, `EXTRACT`, `REASON`, `PROMPT`
 - **H — Human:** `HUMAN_APPROVAL`
+
+---
+
+## Step 2 — Configure your LLM (optional)
+
+Skip this until you run an AI example (`hello_world_ai.ppl`, `incident.ppl`, etc.).
+
+```bash
+ppl provider show
+ppl provider list
+ppl provider test
+```
+
+Set a live provider (PowerShell example):
+
+```powershell
+$env:PPL_AI_PROVIDER = "openai"
+$env:OPENAI_API_KEY = "your-key"
+$env:PPL_AI_MODEL = "gpt-4.1-mini"
+ppl provider test
+```
+
+Or copy `ppl.providers.json.example` from `ppl init` to `ppl.providers.json`. Details: [REAL_AI_RUNTIME.md](REAL_AI_RUNTIME.md) and [wiki/Providers-and-LLM-Configuration.md](../wiki/Providers-and-LLM-Configuration.md).
 
 ---
 

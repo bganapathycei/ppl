@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import sys
@@ -31,6 +32,10 @@ from .production_runtime import InMemoryExecutionStore as ProdStore
 from .production_runtime import ProductionExecutor, StreamEvent
 from .providers.structured import substitute_policy_defaults
 from .store import FileExecutionStore, InMemoryGraphStore
+from .expr import evaluate, evaluate_bool
+from .fs import resolve_path
+from .prompts import prompt_body, render_template
+from .provider import apply_program_environment
 from .tools import build_tool_registry, resolve_action
 from .v03_runtime import HumanApproval
 
@@ -62,7 +67,11 @@ class Runtime:
         interactive: bool | None = None,
     ):
         self.pir = pir
-        self.gateway = gateway or AIGateway()
+        apply_program_environment(pir.get("environments"))
+        if gateway is None:
+            from .provider import build_adapter
+            gateway = AIGateway(build_adapter())
+        self.gateway = gateway
         self.cognitive = CognitiveRuntime(self.gateway.adapter)
         self._prod_store = ProdStore()
         self.production = ProductionExecutor(_AsyncCognitiveAdapter(self.cognitive), self._prod_store)
@@ -73,9 +82,11 @@ class Runtime:
         self.interactive = sys.stdin.isatty() if interactive is None else interactive
         self.context: dict[str, Any] = {}
         self.trace: list[tuple[str, str, str]] = []
+        self.prints: list[str] = []
         self.return_value = None
         self.execution: Execution | None = None
         self.steps_run = 0
+        self._loop_guard = int(os.getenv("PPL_MAX_STEPS", "10000") or 10000)
         default_model = os.getenv("PPL_AI_MODEL") or os.getenv("PPL_OPENAI_MODEL")
         self.policies = {
             k: substitute_policy_defaults(
@@ -86,7 +97,7 @@ class Runtime:
         }
         self.knowledge = load_knowledge_sources(pir.get("knowledge") or [], program_dir)
         self.memory = load_memory(pir.get("memory") or [], pir.get("application") or "app")
-        self.tools = build_tool_registry(pir.get("tools"))
+        self.tools = build_tool_registry(pir.get("tools"), pir.get("imports"))
         self.human = HumanApproval()
 
     def run(
@@ -168,6 +179,12 @@ class Runtime:
             "RUN": self._handle_run,
             "IF": self._handle_if,
             "RETURN": self._handle_return,
+            "LET": self._handle_let,
+            "PRINT": self._handle_print,
+            "READ": self._handle_read,
+            "WRITE": self._handle_write,
+            "FOR": self._handle_for,
+            "WHILE": self._handle_while,
             "HUMAN_APPROVAL": self._handle_human,
             "JOIN": self._handle_join,
             "WAIT": self._handle_wait,
@@ -200,6 +217,125 @@ class Runtime:
         self.trace.append((f"RECEIVE {name}".strip(), "D", "ok"))
         return name
 
+    def _handle_let(self, node: GraphNode, execution: Execution) -> Any:
+        self._budget_guard()
+        step = self._step(node)
+        name = step.get("name", "")
+        value = evaluate(step.get("expr") or step.get("expr_text", ""), execution.context)
+        execution.context[name] = value
+        self.trace.append((f"LET {name}", "D", str(value)))
+        return value
+
+    def _handle_print(self, node: GraphNode, execution: Execution) -> str:
+        self._budget_guard()
+        step = self._step(node)
+        value = evaluate(step.get("expr") or step.get("expr_text", ""), execution.context)
+        text = str(value)
+        self.prints.append(text)
+        print(text)
+        self.trace.append(("PRINT", "D", text))
+        return text
+
+    def _handle_read(self, node: GraphNode, execution: Execution) -> str:
+        self._budget_guard()
+        step = self._step(node)
+        path = str(self._resolve_arg(step.get("path", ""), execution.context))
+        target = resolve_path(path)
+        text = target.read_text(encoding="utf-8")
+        execution.context[step.get("var", "content")] = text
+        self.trace.append((f"READ {target}", "D", f"{len(text)} chars"))
+        return text
+
+    def _handle_write(self, node: GraphNode, execution: Execution) -> str:
+        self._budget_guard()
+        step = self._step(node)
+        path = str(self._resolve_arg(step.get("path", ""), execution.context))
+        value = evaluate(step.get("expr") or step.get("expr_text", ""), execution.context)
+        target = resolve_path(path, create_parents=True)
+        if isinstance(value, (dict, list)):
+            body = json.dumps(value, indent=2)
+        else:
+            body = str(value)
+        target.write_text(body, encoding="utf-8")
+        self.trace.append((f"WRITE {target}", "D", f"{len(body)} chars"))
+        return body
+
+    def _handle_for(self, node: GraphNode, execution: Execution) -> str:
+        self._budget_guard()
+        step = self._step(node)
+        item_name = step.get("item", "item")
+        source = self._resolve_arg(step.get("source", ""), execution.context)
+        if not isinstance(source, list):
+            source = list(source) if isinstance(source, (tuple, set)) else [source]
+        for item in source:
+            execution.context[item_name] = item
+            self._execute_steps(step.get("body") or [], execution)
+        self.trace.append(("FOR", "D", f"{len(source)} items"))
+        return f"{len(source)} items"
+
+    def _handle_while(self, node: GraphNode, execution: Execution) -> str:
+        self._budget_guard()
+        step = self._step(node)
+        iterations = 0
+        while evaluate_bool(step.get("condition") or step.get("condition_text", ""), execution.context):
+            iterations += 1
+            if iterations > self._loop_guard:
+                raise RuntimeError(f"WHILE exceeded PPL_MAX_STEPS={self._loop_guard}")
+            self._execute_steps(step.get("body") or [], execution)
+        self.trace.append(("WHILE", "D", f"{iterations} iterations"))
+        return f"{iterations} iterations"
+
+    def _execute_steps(self, steps: list[dict[str, Any]], execution: Execution) -> None:
+        for step in steps:
+            op = step.get("operation")
+            if op == "LET":
+                name = step.get("name", "")
+                execution.context[name] = evaluate(step.get("expr") or step.get("expr_text", ""), execution.context)
+            elif op == "PRINT":
+                text = str(evaluate(step.get("expr") or step.get("expr_text", ""), execution.context))
+                self.prints.append(text)
+                print(text)
+            elif op == "READ":
+                path = str(self._resolve_arg(step.get("path", ""), execution.context))
+                target = resolve_path(path)
+                execution.context[step.get("var", "content")] = target.read_text(encoding="utf-8")
+            elif op == "WRITE":
+                path = str(self._resolve_arg(step.get("path", ""), execution.context))
+                value = evaluate(step.get("expr") or step.get("expr_text", ""), execution.context)
+                target = resolve_path(path, create_parents=True)
+                body = json.dumps(value, indent=2) if isinstance(value, (dict, list)) else str(value)
+                target.write_text(body, encoding="utf-8")
+            elif op == "IF":
+                taken = "else"
+                if self._eval_condition(step.get("condition") or {}, execution.context):
+                    taken = "then"
+                    self._execute_steps(step.get("then") or [], execution)
+                else:
+                    matched = False
+                    for branch in step.get("else_if") or []:
+                        if self._eval_condition(branch.get("condition") or {}, execution.context):
+                            self._execute_steps(branch.get("steps") or [], execution)
+                            matched = True
+                            break
+                    if not matched:
+                        self._execute_steps(step.get("else") or [], execution)
+            elif op == "RETURN":
+                value = step.get("value") if step.get("literal") else self._return_value(step.get("value"), execution.context)
+                execution.result = value
+                self.return_value = value
+            elif op == "CALL":
+                action = resolve_action(step.get("target") or "")
+                args = {k: self._resolve_arg(v, execution.context) for k, v in (step.get("args") or {}).items()}
+                self.tools.call(action, **args)
+            elif op == "FOR":
+                self._handle_for(GraphNode("inline", "FOR", [], {"step": step}), execution)
+            elif op == "WHILE":
+                self._handle_while(GraphNode("inline", "WHILE", [], {"step": step}), execution)
+            elif op == "RUN":
+                self._run_agent(step.get("name") or "", execution.context)
+            else:
+                continue
+
     def _handle_join(self, node: GraphNode, execution: Execution) -> str:
         self._budget_guard()
         step = self._step(node)
@@ -225,11 +361,11 @@ class Runtime:
         step = self._step(node)
         condition = step.get("condition") or {}
         taken = "else"
-        if self._eval(condition, execution.context):
+        if self._eval_condition(condition, execution.context):
             taken = "then"
         else:
             for idx, branch in enumerate(step.get("else_if") or []):
-                if self._eval(branch.get("condition") or {}, execution.context):
+                if self._eval_condition(branch.get("condition") or {}, execution.context):
                     taken = f"else_if_{idx}"
                     break
         gates = execution.context.setdefault("_gates", {})
@@ -240,7 +376,12 @@ class Runtime:
     def _handle_return(self, node: GraphNode, execution: Execution) -> Any:
         self._budget_guard()
         step = self._step(node)
-        value = step.get("value") if step.get("literal") else self._return_value(step.get("value"), execution.context)
+        if step.get("literal"):
+            value = step.get("value")
+        elif step.get("expr"):
+            value = evaluate(step.get("value"), execution.context)
+        else:
+            value = self._return_value(step.get("value"), execution.context)
         execution.result = value
         self.return_value = value
         self.trace.append(("RETURN", "D", str(value)))
@@ -420,6 +561,28 @@ class Runtime:
                 response = self._cognitive_execute(req)
                 local.update(response.output)
                 self._trace_ai("EXTRACT", response)
+            elif op["operation"] == "PROMPT":
+                template_name = op.get("template", "")
+                try:
+                    template = prompt_body(template_name, self.pir.get("prompts") or [])
+                except KeyError:
+                    template = template_name
+                bindings = {
+                    k: self._resolve_arg(v, local) for k, v in (op.get("bindings") or {}).items()
+                }
+                instruction = render_template(template, bindings)
+                schema = _schema_from_agent_outputs(agent)
+                req = AIRequest(
+                    "REASON",
+                    instruction,
+                    {**payload, "context": local, "knowledge": knowledge_hits},
+                    schema or {"text": "TEXT", "confidence": "CONFIDENCE"},
+                    [],
+                    policy,
+                )
+                response = self._cognitive_execute(req)
+                local.update(response.output)
+                self._trace_ai("PROMPT", response)
             elif op["operation"] == "REASON":
                 req = AIRequest(
                     "REASON",
@@ -478,24 +641,47 @@ class Runtime:
         return cur
 
     def _return_value(self, value: Any, context: dict[str, Any]) -> Any:
+        if isinstance(value, dict) and value.get("kind"):
+            return evaluate(value, context)
         if not isinstance(value, str):
             return value
         if "." in value or value in context:
             return self._resolve(value, context)
-        return value
+        try:
+            return evaluate(value, context)
+        except SyntaxError:
+            return value
+
+    def _eval_condition(self, c: dict[str, Any], context: dict[str, Any]) -> bool:
+        if not c:
+            return False
+        if c.get("type") == "expr":
+            return evaluate_bool(c.get("expr") or c.get("text", ""), context)
+        if "left" in c and "operator" in c:
+            left = self._resolve(c.get("left"), context)
+            right = c.get("right")
+            op = c.get("operator")
+            return {
+                ">": left > right,
+                "<": left < right,
+                ">=": left >= right,
+                "<=": left <= right,
+                "==": left == right,
+                "!=": left != right,
+            }[op]
+        return False
 
     def _eval(self, c: dict[str, Any], context: dict[str, Any]) -> bool:
-        left = self._resolve(c.get("left"), context)
-        right = c.get("right")
-        op = c.get("operator")
-        return {
-            ">": left > right,
-            "<": left < right,
-            ">=": left >= right,
-            "<=": left <= right,
-            "==": left == right,
-            "!=": left != right,
-        }[op]
+        return self._eval_condition(c, context)
+
+
+def _schema_from_agent_outputs(agent: dict[str, Any]) -> dict[str, str]:
+    schema: dict[str, str] = {}
+    for item in agent.get("outputs") or []:
+        if ":" in item:
+            name, type_name = map(str.strip, item.split(":", 1))
+            schema[name] = type_name
+    return schema
 
 
 def approve_execution(store, execution_id: str, decision: str) -> Execution:

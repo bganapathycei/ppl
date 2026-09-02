@@ -1,5 +1,6 @@
 import re
 from .ast import *
+from .expr import parse_expr
 
 
 def clean_lines(text):
@@ -36,6 +37,11 @@ class Parser:
             if line.startswith("APP "):
                 p.app = AppDecl(line[4:].strip())
                 self.i += 1
+            elif line.startswith("IMPORT "):
+                p.imports.append(ImportDecl(line[7:].strip()))
+                self.i += 1
+            elif line.startswith("PROMPT "):
+                p.prompts.append(self.parse_prompt())
             elif line.startswith("INPUT "):
                 p.inputs.append(self.parse_input())
             elif line.startswith("MODEL_POLICY "):
@@ -62,6 +68,12 @@ class Parser:
                 self.error(f"Unexpected line: {line}")
         return p
 
+    def parse_prompt(self):
+        _, parent, line = self.lines[self.i]
+        name = line[len("PROMPT "):].strip()
+        self.i += 1
+        return PromptDecl(name, self._body_lines(parent))
+
     def parse_input(self):
         _, parent, line = self.lines[self.i]
         name = line[6:].strip()
@@ -75,6 +87,29 @@ class Parser:
             fields.append(InputField(n, t))
             self.i += 1
         return InputDecl(name, fields)
+
+    def parse_prompt_use(self, op_indent):
+        _, _, line = self.lines[self.i]
+        rest = line[len("PROMPT "):].strip()
+        template = rest
+        bindings: dict[str, str] = {}
+        if " WITH " in rest.upper():
+            idx = rest.upper().index(" WITH ")
+            template = rest[:idx].strip()
+            binding_text = rest[idx + 6 :].strip()
+            for part in binding_text.split(","):
+                part = part.strip()
+                if "=" in part:
+                    k, v = map(str.strip, part.split("=", 1))
+                    bindings[k] = v
+        self.i += 1
+        while self.i < len(self.lines) and self.lines[self.i][1] > op_indent:
+            _, _, body = self.lines[self.i]
+            if "=" in body:
+                k, v = map(str.strip, body.split("=", 1))
+                bindings[k] = v
+            self.i += 1
+        return PromptUseOp(template, bindings)
 
     def parse_policy(self):
         _, parent, line = self.lines[self.i]
@@ -177,6 +212,8 @@ class Parser:
             elif line.upper().startswith("USE MEMORY "):
                 agent.memory.append(line[11:].strip())
                 self.i += 1
+            elif line.startswith("PROMPT "):
+                agent.operations.append(self.parse_prompt_use(indent))
             elif line.startswith("CLASSIFY "):
                 agent.operations.append(self.parse_classify(indent))
             elif line == "EXTRACT":
@@ -258,7 +295,23 @@ class Parser:
         steps = []
         while self.i < len(self.lines) and self.lines[self.i][1] > parent_indent:
             _, indent, line = self.lines[self.i]
-            if line.startswith("RECEIVE "):
+            if line.startswith("LET "):
+                steps.append(self.parse_let(line))
+                self.i += 1
+            elif line.startswith("PRINT "):
+                steps.append(PrintStep(line[6:].strip()))
+                self.i += 1
+            elif line.startswith("READ "):
+                steps.append(self.parse_read(line))
+                self.i += 1
+            elif line.startswith("WRITE "):
+                steps.append(self.parse_write(line))
+                self.i += 1
+            elif line.startswith("FOR "):
+                steps.append(self.parse_for(indent))
+            elif line.startswith("WHILE "):
+                steps.append(self.parse_while(indent))
+            elif line.startswith("RECEIVE "):
                 steps.append(ReceiveStep(line[8:].strip()))
                 self.i += 1
             elif line.startswith("RUN "):
@@ -290,6 +343,47 @@ class Parser:
             else:
                 self.error(f"Unexpected WORKFLOW statement: {line}")
         return steps
+
+    def parse_let(self, line):
+        rest = line[4:].strip()
+        if "=" not in rest:
+            self.error(f"LET requires assignment: {line}")
+        name, expr = map(str.strip, rest.split("=", 1))
+        return LetStep(name, expr)
+
+    def parse_read(self, line):
+        rest = line[5:].strip()
+        m = re.match(r"(.+?)\s+INTO\s+(.+)$", rest, re.I)
+        if not m:
+            self.error(f"READ requires 'path INTO var': {line}")
+        return ReadStep(m.group(1).strip(), m.group(2).strip())
+
+    def parse_write(self, line):
+        rest = line[6:].strip()
+        m = re.match(r"(.+?)\s+FROM\s+(.+)$", rest, re.I)
+        if not m:
+            self.error(f"WRITE requires 'path FROM expr': {line}")
+        return WriteStep(m.group(1).strip(), m.group(2).strip())
+
+    def parse_for(self, indent):
+        line = self.lines[self.i][2]
+        rest = line[4:].strip()
+        m = re.match(r"(.+?)\s+IN\s+(.+?)\s+DO$", rest, re.I)
+        if not m:
+            self.error(f"FOR requires 'item IN source DO': {line}")
+        self.i += 1
+        body = self.parse_steps(indent)
+        return ForStep(m.group(1).strip(), m.group(2).strip(), body)
+
+    def parse_while(self, indent):
+        line = self.lines[self.i][2]
+        rest = line[6:].strip()
+        if not rest.upper().endswith(" DO"):
+            self.error(f"WHILE requires trailing DO: {line}")
+        condition = rest[:-2].strip()
+        self.i += 1
+        body = self.parse_steps(indent)
+        return WhileStep(condition, body)
 
     def parse_human_approval(self, indent):
         self.i += 1
@@ -335,7 +429,7 @@ class Parser:
         line = self.lines[self.i][2]
         if line.startswith("IF "):
             line = line[3:].strip()
-        condition = self.parse_condition(line)
+        condition = self.parse_condition_or_expr(line)
         self.i += 1
         then_steps = self.parse_steps(indent)
         else_if = []
@@ -343,7 +437,7 @@ class Parser:
         while self.i < len(self.lines) and self.lines[self.i][1] == indent:
             line = self.lines[self.i][2]
             if line.startswith("ELSE IF "):
-                c = self.parse_condition(line[8:].strip())
+                c = self.parse_condition_or_expr(line[8:].strip())
                 self.i += 1
                 else_if.append((c, self.parse_steps(indent)))
             elif line == "ELSE":
@@ -354,11 +448,26 @@ class Parser:
                 break
         return IfStep(condition, then_steps, else_if, else_steps)
 
-    def parse_condition(self, text):
+    def parse_condition_or_expr(self, text):
+        if re.search(r"\b(AND|OR|NOT)\b", text, re.I):
+            return text
+        if any(op in text for op in (">=", "<=", "==", "!=", ">", "<")) and not re.match(
+            r"^[^+\-*/%]+?\s*(>=|<=|==|!=|>|<)\s*.+$", text
+        ):
+            return text
         m = re.match(r"(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+)$", text)
-        if not m:
-            self.error(f"Invalid condition: {text}")
-        return Condition(m.group(1).strip(), m.group(2), self.parse_value(m.group(3).strip()))
+        if m:
+            return Condition(m.group(1).strip(), m.group(2), self.parse_value(m.group(3).strip()))
+        # Full expression condition
+        parse_expr(text)
+        return text
+
+    def parse_condition(self, text):
+        result = self.parse_condition_or_expr(text)
+        if isinstance(result, Condition):
+            return result
+        self.error(f"Invalid condition: {text}")
+        return result
 
     def parse_value(self, value):
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":

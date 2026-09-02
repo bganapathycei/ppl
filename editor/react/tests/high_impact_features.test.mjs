@@ -48,7 +48,7 @@ assert.ok(read("react/src/nodes.jsx").includes("onToggleDecl"), "react collapse 
 assert.ok(read("js/flow.js").includes("data-toggle"), "vanilla collapse toggles");
 
 // 6. Validation badges on canvas
-const bad = parsePpl(readFileSync(join(root, "templates/hello_world.ppl"), "utf8"));
+const bad = helloWorldDocument();
 const runStep = bad.children.find((c) => c.kind === "workflow").children.find((s) => s.kind === "run");
 runStep.name = "MissingAgent";
 const issues = validate(bad);
