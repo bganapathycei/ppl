@@ -7,6 +7,7 @@
 
 import { BLOCKS, TYPES, OPERATORS } from "./schema.js";
 import { createNode, getNode, getSlot, insertNode, removeNode, setProp } from "./model.js";
+import { collectRefOptions } from "./refLinks.js";
 
 const SIMPLE_KINDS = new Set([
   "field",
@@ -27,10 +28,30 @@ function esc(value) {
     .replace(/"/g, "&quot;");
 }
 
-function control(node, field) {
+function control(node, field, program) {
   const value = node[field.prop];
   const id = node.id;
   const prop = field.prop;
+
+  if (node.kind === "run" && prop === "name") {
+    const options = collectRefOptions(program, "run");
+    if (options.length) {
+      const opts = [`<option value="">— pick agent —</option>`]
+        .concat(options.map((o) => `<option value="${esc(o)}" ${value === o ? "selected" : ""}>${esc(o)}</option>`))
+        .join("");
+      return `<select data-id="${id}" data-prop="${prop}">${opts}</select>`;
+    }
+  }
+  if (node.kind === "receive" && prop === "name") {
+    const options = collectRefOptions(program, "receive");
+    if (options.length) {
+      const opts = [`<option value="">— pick input —</option>`]
+        .concat(options.map((o) => `<option value="${esc(o)}" ${value === o ? "selected" : ""}>${esc(o)}</option>`))
+        .join("");
+      return `<select data-id="${id}" data-prop="${prop}">${opts}</select>`;
+    }
+  }
+
   if (field.kind === "textarea") {
     return `<textarea data-id="${id}" data-prop="${prop}" rows="3" placeholder="${esc(field.placeholder || "")}">${esc(value ?? "")}</textarea>`;
   }
@@ -48,10 +69,15 @@ function control(node, field) {
   return `<input data-id="${id}" data-prop="${prop}" value="${esc(value ?? "")}" placeholder="${esc(field.placeholder || "")}">`;
 }
 
-function fieldRow(node, field) {
-  if (field.kind === "check") return `<div class="insp-row">${control(node, field)}</div>`;
-  const label = field.prop.replace(/_/g, " ");
-  return `<div class="insp-row"><label class="insp-label">${esc(label)}</label>${control(node, field)}</div>`;
+function fieldRow(node, field, program) {
+  if (field.kind === "check") return `<div class="insp-row">${control(node, field, program)}</div>`;
+  const label =
+    node.kind === "run" && field.prop === "name"
+      ? "agent"
+      : node.kind === "receive" && field.prop === "name"
+        ? "input"
+        : field.prop.replace(/_/g, " ");
+  return `<div class="insp-row"><label class="insp-label">${esc(label)}</label>${control(node, field, program)}</div>`;
 }
 
 function inlineSlot(node, spec) {
@@ -63,7 +89,7 @@ function inlineSlot(node, spec) {
   if (!list.length) html += `<p class="insp-empty">none</p>`;
   for (const item of list) {
     html += `<div class="insp-item">`;
-    for (const field of childDef.fields || []) html += control(item, field);
+    for (const field of childDef.fields || []) html += control(item, field, program);
     html += `<button type="button" class="insp-del" data-delitem="${item.id}" title="Remove">✕</button>`;
     html += `</div>`;
   }
@@ -84,7 +110,7 @@ export function renderInspector(container, program, selectedId, handlers) {
   }
   html += `</div>`;
 
-  for (const field of def.fields || []) html += fieldRow(node, field);
+  for (const field of def.fields || []) html += fieldRow(node, field, program);
 
   for (const spec of def.slots || []) {
     if ((spec.accept || []).every((k) => SIMPLE_KINDS.has(k))) html += inlineSlot(node, spec);
@@ -94,7 +120,12 @@ export function renderInspector(container, program, selectedId, handlers) {
   if (complex.length) {
     html += `<p class="insp-hint">Add ${complex
       .map((s) => (s.label || s.name).toLowerCase())
-      .join(", ")} from the canvas “+” or the Blocks view.</p>`;
+      .join(", ")} from the palette or canvas “+”.</p>`;
+  }
+
+  const nodeIssues = (handlers.issues || []).filter((i) => i.nodeId === node.id);
+  if (nodeIssues.length) {
+    html += `<ul class="insp-issues">${nodeIssues.map((i) => `<li class="insp-issue-${i.level}">${esc(i.message)}</li>`).join("")}</ul>`;
   }
 
   container.innerHTML = html;

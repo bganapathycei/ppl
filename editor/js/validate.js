@@ -1,3 +1,5 @@
+import { walk } from "./model.js";
+
 export function validate(program) {
   const issues = [];
   const children = program.children || [];
@@ -13,10 +15,18 @@ export function validate(program) {
   function checkSteps(steps, where) {
     for (const step of steps || []) {
       if (step.kind === "run" && step.name && !agents.has(step.name)) {
-        issues.push({ level: "error", message: `${where}: RUN ${step.name} — unknown agent` });
+        issues.push({
+          level: "error",
+          message: `${where}: RUN ${step.name} — unknown agent`,
+          nodeId: step.id,
+        });
       }
       if (step.kind === "receive" && step.name && !inputs.has(step.name)) {
-        issues.push({ level: "warning", message: `${where}: RECEIVE ${step.name} — unknown input` });
+        issues.push({
+          level: "warning",
+          message: `${where}: RECEIVE ${step.name} — unknown input`,
+          nodeId: step.id,
+        });
       }
       if (step.kind === "if") {
         checkSteps(step.children, where);
@@ -29,9 +39,25 @@ export function validate(program) {
 
   for (const workflow of workflows) {
     if (!(workflow.children || []).length) {
-      issues.push({ level: "warning", message: `WORKFLOW ${workflow.name} is empty` });
+      issues.push({
+        level: "warning",
+        message: `WORKFLOW ${workflow.name} is empty`,
+        nodeId: workflow.id,
+      });
     }
     checkSteps(workflow.children, `WORKFLOW ${workflow.name}`);
   }
   return issues;
+}
+
+/** Group validation issues by AST node id for canvas badges. */
+export function issuesByNodeId(program) {
+  const map = new Map();
+  for (const issue of validate(program)) {
+    if (!issue.nodeId) continue;
+    const list = map.get(issue.nodeId) || [];
+    list.push(issue);
+    map.set(issue.nodeId, list);
+  }
+  return map;
 }

@@ -7,6 +7,8 @@ import { layoutProgram } from "./flow_layout.js";
 const view = { tx: 24, ty: 20, scale: 1 };
 let stageEl = null;
 let lastLayout = null;
+let flowHandlers = null;
+let flowOptions = {};
 
 function esc(value) {
   return String(value ?? "")
@@ -21,11 +23,30 @@ function edgePath(e) {
   return `M ${e.x1} ${e.y1} C ${e.x1} ${midY}, ${e.x2} ${midY}, ${e.x2} ${e.y2}`;
 }
 
+function renderContainer(container, selectedId) {
+  const selected = container.selectable && container.id === selectedId ? " selected" : "";
+  const selectable = container.selectable ? " selectable" : "";
+  const declToggle = container.hasDeclarations
+    ? `<button type="button" class="flow-container-section-toggle${container.declCollapsed ? " collapsed" : ""}" data-toggle="decl" style="top:${container.declLabelY - container.y}px">${container.declCollapsed ? "▸" : "▾"} Declarations${container.declCount ? ` (${container.declCount})` : ""}</button>`
+    : "";
+  const workflowToggle =
+    container.hasWorkflows && container.workflowLabelY != null
+      ? `<button type="button" class="flow-container-section-toggle${container.wfCollapsed ? " collapsed" : ""}" data-toggle="wf" style="top:${container.workflowLabelY - container.y}px">${container.wfCollapsed ? "▸" : "▾"} Workflows${container.wfCount ? ` (${container.wfCount})` : ""}</button>`
+      : "";
+  const nameCls = container.renamable ? " flow-container-name flow-renamable" : " flow-container-name";
+  return `<div class="flow-container${selected}${selectable}" ${container.selectable ? `data-id="${container.id}"` : ""} style="left:${container.x}px;top:${container.y}px;width:${container.w}px;height:${container.h}px">
+    <div class="flow-container-header">
+      <span class="flow-container-kw">APP</span>
+      <span class="${nameCls.trim()}" ${container.renamable ? `data-rename-id="${container.id}"` : ""}>${esc(container.appName)}</span>
+    </div>${declToggle}${workflowToggle}
+  </div>`;
+}
+
 function renderEdges(layout) {
   const paths = layout.edges
     .map((e) => {
-      const cls = `flow-edge flow-edge-${e.kind}`;
-      const marker = e.kind === "add" ? "" : ` marker-end="url(#flow-arrow)"`;
+      const cls = `flow-edge flow-edge-${e.kind}${e.refActive ? " flow-edge-ref-active" : ""}`;
+      const marker = e.kind === "add" || e.kind === "ref" ? "" : ` marker-end="url(#flow-arrow)"`;
       return `<path class="${cls}" d="${edgePath(e)}"${marker}/>`;
     })
     .join("");
@@ -57,10 +78,18 @@ function renderNode(item, selectedId) {
   }
   const selected = item.selectable && item.id === selectedId ? " selected" : "";
   const clickable = item.selectable ? " selectable" : "";
+  const issueCls = item.issueLevel ? ` has-issue issue-${item.issueLevel}` : "";
+  const traceCls = item.traceStatus ? ` trace-${item.traceStatus}` : "";
+  const refCls = item.refHighlight ? " ref-highlight" : "";
+  const renameCls = item.renamable ? " flow-renamable" : "";
   const lines = (item.lines || []).map((l) => `<span>${esc(l)}</span>`).join("");
-  return `<div class="flow-node tone-${item.tone} role-${item.role}${selected}${clickable}" ${item.selectable ? `data-id="${item.id}"` : ""} style="left:${item.x}px;top:${item.y}px;width:${item.w}px;min-height:${item.h}px">
+  const badge = item.issueLevel
+    ? `<span class="flow-issue flow-issue-${item.issueLevel}" title="${esc(item.issueTip || "")}">!</span>`
+    : "";
+  return `<div class="flow-node tone-${item.tone} role-${item.role}${selected}${clickable}${issueCls}${traceCls}${refCls}" ${item.selectable ? `data-id="${item.id}"` : ""} style="left:${item.x}px;top:${item.y}px;width:${item.w}px;min-height:${item.h}px">
+    ${badge}
     <div class="flow-kw">${esc(item.keyword)}</div>
-    <div class="flow-title">${esc(item.title)}</div>
+    <div class="flow-title${renameCls}" ${item.renamable ? `data-rename-id="${item.id}"` : ""}>${esc(item.title)}</div>
     ${lines ? `<div class="flow-lines">${lines}</div>` : ""}
   </div>`;
 }
@@ -69,12 +98,14 @@ function applyTransform() {
   if (stageEl) stageEl.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`;
 }
 
-export function renderFlow(container, program, selectedId) {
+export function renderFlow(container, program, selectedId, options = {}) {
+  flowOptions = options;
   const maxWidth = Math.max(700, container.clientWidth - 80);
-  const layout = layoutProgram(program, { maxWidth });
+  const layout = layoutProgram(program, { maxWidth, ...options });
   lastLayout = layout;
+  const containerHtml = layout.container ? renderContainer(layout.container, selectedId) : "";
   const nodes = layout.items.map((item) => renderNode(item, selectedId)).join("");
-  container.innerHTML = `<div class="flow-stage" style="width:${layout.width}px;height:${layout.height}px">${renderEdges(layout)}${nodes}</div>`;
+  container.innerHTML = `<div class="flow-stage" style="width:${layout.width}px;height:${layout.height}px">${renderEdges(layout)}${containerHtml}${nodes}</div>`;
   stageEl = container.querySelector(".flow-stage");
   applyTransform();
 }
@@ -95,11 +126,51 @@ export function zoomFlow(container, factor) {
   applyTransform();
 }
 
+function startInlineRename(target) {
+  const id = target.dataset.renameId;
+  if (!id || target.querySelector("input")) return;
+  const current = target.textContent;
+  const input = document.createElement("input");
+  input.className = "flow-rename-input";
+  input.value = current;
+  target.textContent = "";
+  target.appendChild(input);
+  input.focus();
+  input.select();
+  const commit = () => {
+    const value = input.value.trim() || current;
+    flowHandlers?.onRename?.(id, value);
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") {
+      target.textContent = current;
+      input.remove();
+    }
+    e.stopPropagation();
+  });
+  input.addEventListener("dblclick", (e) => e.stopPropagation());
+}
+
 export function bindFlow(container, getProgram, handlers) {
+  flowHandlers = handlers;
+
   container.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-toggle]");
+    if (toggle) {
+      if (toggle.dataset.toggle === "decl") handlers.onToggleDecl?.();
+      if (toggle.dataset.toggle === "wf") handlers.onToggleWf?.();
+      return;
+    }
     const add = event.target.closest(".flow-add");
     if (add) {
       handlers.onAdd(add.dataset.addOwner, add.dataset.addSlot, Number(add.dataset.addIndex));
+      return;
+    }
+    const containerNode = event.target.closest(".flow-container.selectable");
+    if (containerNode) {
+      handlers.onSelect(containerNode.dataset.id);
       return;
     }
     const node = event.target.closest(".flow-node.selectable");
@@ -107,10 +178,36 @@ export function bindFlow(container, getProgram, handlers) {
       handlers.onSelect(node.dataset.id);
       return;
     }
-    if (!event.target.closest(".flow-node")) handlers.onSelect(null);
+    if (!event.target.closest(".flow-node, .flow-add, .flow-container")) handlers.onSelect(null);
   });
 
-  // Wheel zoom toward the pointer.
+  container.addEventListener("dblclick", (event) => {
+    const rename = event.target.closest(".flow-renamable");
+    if (rename) {
+      event.preventDefault();
+      event.stopPropagation();
+      startInlineRename(rename);
+    }
+  });
+
+  container.addEventListener(
+    "mouseenter",
+    (event) => {
+      const node = event.target.closest(".flow-node.selectable");
+      if (node?.dataset.id) handlers.onHover?.(node.dataset.id);
+    },
+    true,
+  );
+
+  container.addEventListener(
+    "mouseleave",
+    (event) => {
+      const node = event.target.closest(".flow-node.selectable");
+      if (node?.dataset.id) handlers.onHoverEnd?.();
+    },
+    true,
+  );
+
   container.addEventListener(
     "wheel",
     (event) => {
@@ -130,10 +227,9 @@ export function bindFlow(container, getProgram, handlers) {
     { passive: false },
   );
 
-  // Drag background to pan.
   let panning = null;
   container.addEventListener("pointerdown", (event) => {
-    if (event.target.closest(".flow-node, .flow-add")) return;
+    if (event.target.closest(".flow-node, .flow-add, .flow-container, .flow-rename-input")) return;
     panning = { x: event.clientX, y: event.clientY, tx: view.tx, ty: view.ty };
     container.classList.add("panning");
     container.setPointerCapture(event.pointerId);

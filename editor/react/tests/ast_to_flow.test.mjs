@@ -40,6 +40,16 @@ function check(name) {
       assert.equal(out.length, 0, `${name}: RETURN ${node.id} should not have an outgoing edge`);
     }
   }
+
+  const containers = nodes.filter((n) => n.type === "appContainer");
+  assert.equal(containers.length, 1, `${name}: expected one appContainer node`);
+  const containerId = containers[0].id;
+  const children = nodes.filter((n) => n.type === "ppl");
+  assert.ok(children.length > 0, `${name}: expected child ppl nodes inside container`);
+  for (const child of children) {
+    assert.equal(child.parentId, containerId, `${name}: child ${child.id} missing parentId`);
+  }
+
   return { name, nodes: nodes.length, edges: edges.length };
 }
 
@@ -50,5 +60,10 @@ const incident = buildFlow(load("incident"));
 const branchEdges = incident.edges.filter((e) => e.data?.kind === "branch");
 assert.ok(branchEdges.length >= 2, "incident: IF should fan out into labeled branches");
 assert.ok(branchEdges.every((e) => e.label), "incident: branch edges should be labeled");
+
+// hello_world should link workflow steps to declarations.
+const hello = buildFlow(load("hello_world"));
+const refEdges = hello.edges.filter((e) => e.data?.kind === "ref");
+assert.ok(refEdges.length >= 2, "hello_world: expected RECEIVE→INPUT and RUN→AGENT reference edges");
 
 console.log("ast_to_flow OK", JSON.stringify(summary));

@@ -355,7 +355,41 @@ function makeAddChip(ownerId, slot, index, label) {
   };
 }
 
-// Top band: APP, declarations and agents as reference cards (not control flow).
+// Cross-links from workflow steps to declaration nodes (RECEIVE→INPUT, RUN→AGENT).
+export function collectReferenceLinks(program) {
+  const children = program.children || [];
+  const inputByName = new Map();
+  const agentByName = new Map();
+  for (const child of children) {
+    if (child.kind === "input" && child.name) inputByName.set(child.name, child.id);
+    if (child.kind === "agent" && child.name) agentByName.set(child.name, child.id);
+  }
+
+  const links = [];
+  function walk(steps) {
+    for (const step of steps || []) {
+      if (step.kind === "receive" && step.name && inputByName.has(step.name)) {
+        links.push({ stepId: step.id, declId: inputByName.get(step.name) });
+      }
+      if (step.kind === "run" && step.name && agentByName.has(step.name)) {
+        links.push({ stepId: step.id, declId: agentByName.get(step.name) });
+      }
+      if (step.kind === "if") {
+        walk(step.children);
+        for (const branch of step.elseIf || []) walk(branch.children);
+        walk(step.elseChildren);
+      }
+      if (step.kind === "parallel") walk(step.children);
+    }
+  }
+
+  for (const workflow of children.filter((child) => child.kind === "workflow")) {
+    walk(workflow.children);
+  }
+  return links;
+}
+
+// Declaration cards laid out in a wrapping band (not control flow).
 function measureBand(cards, maxWidth) {
   const items = [];
   let x = 0;
@@ -376,83 +410,171 @@ function measureBand(cards, maxWidth) {
   return { items, w: bandW, h: y + rowH };
 }
 
+const CONTAINER = {
+  headerH: 44,
+  sectionLabelH: 22,
+  zoneGap: 28,
+  innerPad: 24,
+  collapsedSectionH: 28,
+};
+
+function decorateItem(item, options) {
+  if (!item.id || item.kind !== "box") return;
+  const issues = options.issuesByNode?.get(item.id) || [];
+  if (issues.length) {
+    item.issueLevel = issues.some((i) => i.level === "error") ? "error" : "warn";
+    item.issueTip = issues.map((i) => i.message).join("\n");
+  }
+  const trace = options.traceState || {};
+  if (trace.executedIds?.has(item.id)) {
+    item.traceStatus = item.id === trace.lastExecutedId ? "active" : "executed";
+  }
+  item.refHighlight = options.refLinked?.has(item.id) || item.id === options.hoverAstId;
+  item.renamable = ["input", "agent", "workflow"].includes(item.nodeKind);
+}
+
 /**
- * Lay out the whole program.
- * @returns {{width:number,height:number,items:Array,edges:Array}}
+ * Lay out the whole program inside an APP container frame.
+ * @returns {{width:number,height:number,items:Array,edges:Array,container:Object}}
  */
 export function layoutProgram(program, options = {}) {
   const maxWidth = options.maxWidth || 1100;
+  const collapsed = options.collapsed || {};
+  const declCollapsed = Boolean(collapsed.declarations);
+  const wfCollapsed = Boolean(collapsed.workflows);
   const children = program.children || [];
-  const decls = children.filter((c) => c.kind !== "workflow");
-  const workflows = children.filter((c) => c.kind === "workflow");
+  const appNode = children.find((child) => child.kind === "app");
+  const appName = appNode?.name || "MyApplication";
+  const appId = appNode?.id || null;
+  const decls = children.filter((child) => child.kind !== "workflow" && child.kind !== "app");
+  const workflows = children.filter((child) => child.kind === "workflow");
 
   const items = [];
   const edges = [];
-  let cursorY = FLOW.pad;
-  let width = FLOW.nodeW;
+  const innerX = FLOW.pad + CONTAINER.innerPad;
+  const declLabelY = FLOW.pad + CONTAINER.headerH + 6;
+  let cursorY = declLabelY + CONTAINER.sectionLabelH + 6;
+  if (declCollapsed && decls.length) cursorY = declLabelY + CONTAINER.collapsedSectionH;
 
-  if (decls.length) {
+  if (decls.length && !declCollapsed) {
     const cards = decls.map((node) => makeBox(node, { role: node.kind === "agent" ? "agent" : "resource" }));
-    const band = measureBand(cards, maxWidth);
+    const band = measureBand(cards, maxWidth - CONTAINER.innerPad * 2);
     for (const item of band.items) {
-      item.x += FLOW.pad;
+      item.x += innerX;
       item.y += cursorY;
+      decorateItem(item, options);
       items.push(item);
     }
-    width = Math.max(width, band.w + FLOW.pad * 2);
-    cursorY += band.h + FLOW.bandGap;
+    cursorY += band.h + CONTAINER.zoneGap;
   }
 
-  for (const wf of workflows) {
-    const headerBox = makeBox(wf, { role: "workflow-title" });
-    const headerLayout = measureLeaf(headerBox);
-    const body = measureSequence(wf.children, wf.id, "children");
-    const axis = Math.max(headerLayout.inX, body.inX);
+  const workflowLabelY = workflows.length ? cursorY : null;
+  if (workflows.length) {
+    cursorY += declCollapsed && !decls.length ? 0 : CONTAINER.sectionLabelH + 6;
+    if (wfCollapsed) cursorY = workflowLabelY + CONTAINER.collapsedSectionH;
+  }
 
-    offset(headerLayout, FLOW.pad + axis - headerLayout.inX, cursorY);
-    items.push(...headerLayout.items);
-    const headerOut = headerLayout.items[0];
+  if (!wfCollapsed) {
+    for (const wf of workflows) {
+      const headerBox = makeBox(wf, { role: "workflow-title" });
+      const headerLayout = measureLeaf(headerBox);
+      const body = measureSequence(wf.children, wf.id, "children");
+      const axis = Math.max(headerLayout.inX, body.inX);
 
-    const bodyY = cursorY + headerBox.h + FLOW.vGap;
-    offset(body, FLOW.pad + axis - body.inX, bodyY);
-    items.push(...body.items);
-    edges.push(...body.edges);
-    edges.push({
-      x1: headerOut.x + headerOut.w / 2,
-      y1: headerOut.y + headerOut.h,
-      x2: FLOW.pad + axis,
-      y2: bodyY,
-      kind: "flow",
-    });
+      offset(headerLayout, innerX + axis - headerLayout.inX, cursorY);
+      for (const item of headerLayout.items) {
+        decorateItem(item, options);
+        items.push(item);
+      }
+      const headerOut = headerLayout.items[0];
 
-    // "+ step" chip below the workflow body (no connector from a terminal path).
-    const chip = makeAddChip(wf.id, "children", (wf.children || []).length, "+ step");
-    const chipX = FLOW.pad + axis - chip.w / 2;
-    const chipY = bodyY + body.h + FLOW.vGap;
-    items.push({ ...chip, x: chipX, y: chipY });
-    if (!body.terminal) {
+      const bodyY = cursorY + headerBox.h + FLOW.vGap;
+      offset(body, innerX + axis - body.inX, bodyY);
+      for (const item of body.items) {
+        decorateItem(item, options);
+        items.push(item);
+      }
+      edges.push(...body.edges);
       edges.push({
-        x1: FLOW.pad + axis,
-        y1: bodyY + body.h,
-        x2: FLOW.pad + axis,
-        y2: chipY,
-        kind: "add",
+        x1: headerOut.x + headerOut.w / 2,
+        y1: headerOut.y + headerOut.h,
+        x2: innerX + axis,
+        y2: bodyY,
+        kind: "flow",
       });
-    }
 
-    width = Math.max(width, FLOW.pad + axis - body.inX + body.w + FLOW.pad);
-    cursorY = chipY + chip.h + FLOW.bandGap;
+      const chip = makeAddChip(wf.id, "children", (wf.children || []).length, "+ step");
+      const chipX = innerX + axis - chip.w / 2;
+      const chipY = bodyY + body.h + FLOW.vGap;
+      items.push({ ...chip, x: chipX, y: chipY });
+      if (!body.terminal) {
+        edges.push({
+          x1: innerX + axis,
+          y1: bodyY + body.h,
+          x2: innerX + axis,
+          y2: chipY,
+          kind: "add",
+        });
+      }
+
+      cursorY = chipY + chip.h + FLOW.bandGap;
+    }
   }
 
-  // Program-level add chip (declarations / agents / workflows).
   const progChip = makeAddChip(program.id, "children", children.length, "+ block");
+  let maxRight = FLOW.pad + CONTAINER.innerPad;
+  for (const item of items) maxRight = Math.max(maxRight, item.x + item.w);
+  const containerW = Math.max(maxRight - FLOW.pad + CONTAINER.innerPad, FLOW.nodeW + FLOW.pad);
+  const containerH = cursorY - FLOW.pad + CONTAINER.innerPad;
+  const container = {
+    kind: "container",
+    role: "app-container",
+    id: appId,
+    appName,
+    x: FLOW.pad,
+    y: FLOW.pad,
+    w: containerW,
+    h: containerH,
+    declLabelY,
+    workflowLabelY,
+    hasDeclarations: decls.length > 0,
+    hasWorkflows: workflows.length > 0,
+    declCount: decls.length,
+    wfCount: workflows.length,
+    declCollapsed,
+    wfCollapsed,
+    renamable: Boolean(appId),
+    selectable: Boolean(appId),
+  };
+
   items.push({ ...progChip, x: FLOW.pad, y: cursorY });
   cursorY += progChip.h + FLOW.pad;
 
+  const idByAst = new Map(items.filter((item) => item.id).map((item) => [item.id, item]));
+  if (!wfCollapsed) {
+    for (const link of collectReferenceLinks(program)) {
+      const step = idByAst.get(link.stepId);
+      const decl = idByAst.get(link.declId);
+      if (!step || !decl) continue;
+      const active =
+        options.hoverAstId &&
+        (options.refLinked?.has(link.stepId) || options.refLinked?.has(link.declId));
+      edges.push({
+        x1: step.x + step.w / 2,
+        y1: step.y,
+        x2: decl.x + decl.w / 2,
+        y2: decl.y + decl.h,
+        kind: "ref",
+        refActive: Boolean(active),
+      });
+    }
+  }
+
   return {
-    width: Math.max(width, FLOW.nodeW + FLOW.pad * 2),
-    height: cursorY,
+    width: Math.max(containerW + FLOW.pad * 2, FLOW.nodeW + FLOW.pad * 2),
+    height: containerH + FLOW.pad * 2,
     items,
     edges,
+    container,
   };
 }

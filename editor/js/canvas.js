@@ -108,7 +108,26 @@ function applyDrop(program, zone) {
 }
 
 export function renderCanvas(container, program) {
-  container.innerHTML = renderSlot(program, "children", "Program");
+  const children = program.children || [];
+  const accept = (BLOCKS.program?.slots?.[0]?.accept || []).join(",");
+  let html = `<div class="slot" data-drop="1" data-parent="${program.id}" data-slot="children" data-index="${children.length}" data-accept="${accept}">`;
+  html += `<div class="slot-label">Program</div>`;
+  html += `<div class="program-section-label">Declarations</div>`;
+
+  let index = 0;
+  let sawWorkflow = false;
+  for (const child of children) {
+    if (child.kind === "workflow" && !sawWorkflow) {
+      html += `<div class="program-section-label">Workflows</div>`;
+      sawWorkflow = true;
+    }
+    html += `<div class="drop-gap" data-drop="1" data-parent="${program.id}" data-slot="children" data-index="${index}" data-accept="${accept}"></div>`;
+    html += renderBlock(child);
+    index += 1;
+  }
+  html += `<div class="drop-gap" data-drop="1" data-parent="${program.id}" data-slot="children" data-index="${index}" data-accept="${accept}"></div>`;
+  html += "</div>";
+  container.innerHTML = html;
 }
 
 export function bindCanvas(container, getProgram, handlers) {

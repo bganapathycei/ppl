@@ -6,14 +6,16 @@ import { generatePpl, appName } from "./codegen.js";
 import { parsePpl } from "./parse.js";
 import { compileProgram, fallbackGraph } from "./compile.js";
 import { renderGraph } from "./graph.js";
-import { validate } from "./validate.js";
+import { validate, issuesByNodeId } from "./validate.js";
 import { accepts } from "./schema.js";
-import { createNode, getNode, insertNode, getSlot, helloWorldDocument } from "./model.js";
+import { createNode, getNode, insertNode, getSlot, helloWorldDocument, setProp } from "./model.js";
 import { selectedKind, clearSelectedKind } from "./dnd.js";
 import { loadExampleSource } from "./templates.js";
 import { formatResult, runProgram } from "./run.js";
 import { renderTrace } from "./results.js";
 import { initAssistant } from "./assistant.js";
+import { refLinkedIds } from "./refLinks.js";
+import { mapTraceToAstIds } from "./traceMap.js";
 
 const STORAGE_KEY = "ppl-editor-v1";
 const INPUT_KEY = "ppl-editor-input-v1";
@@ -47,6 +49,10 @@ let lastExecutionId = null;
 let lastWaitOptions = [];
 let viewMode = "flow";
 let selectedId = null;
+let collapsed = { declarations: false, workflows: false };
+let traceState = { executedIds: new Set(), lastExecutedId: null };
+let hoverAstId = null;
+let currentIssues = [];
 
 function loadStored() {
   try {
@@ -113,7 +119,15 @@ function refreshCanvas() {
 }
 
 function refreshFlow() {
-  renderFlow(els.flow, program, selectedId);
+  const issuesByNode = issuesByNodeId(program);
+  const refLinked = refLinkedIds(program, hoverAstId);
+  renderFlow(els.flow, program, selectedId, {
+    collapsed,
+    issuesByNode,
+    traceState,
+    hoverAstId,
+    refLinked,
+  });
 }
 
 const inspectorHandlers = {
@@ -131,7 +145,7 @@ const inspectorHandlers = {
 };
 
 function refreshProps() {
-  renderInspector(els.props, program, selectedId, inspectorHandlers);
+  renderInspector(els.props, program, selectedId, { ...inspectorHandlers, issues: currentIssues });
 }
 
 function setSelected(id) {
@@ -175,6 +189,7 @@ async function refreshSourceAndGraph() {
   const source = generatePpl(program);
   els.source.textContent = source || "// empty program";
   const issues = validate(program);
+  currentIssues = issues;
   showIssues(issues);
   const errors = issues.filter((issue) => issue.level === "error");
   if (errors.length) setStatus(errors[0].message, "err");
@@ -287,7 +302,9 @@ async function executeRun(options = {}) {
   if (!run.ok) {
     setStatus(run.error || "Run failed", "err");
     els.runResult.textContent = run.error || "Run failed";
+    traceState = mapTraceToAstIds(program, run.trace || []);
     renderTrace(els.runTrace, run.trace || [], run.node_status || [], false, null);
+    refreshFlow();
     return;
   }
 
@@ -298,7 +315,9 @@ async function executeRun(options = {}) {
     setStatus(`Waiting — ${run.wait?.reason || "paused"}`, "warn");
     lastWaitOptions = run.wait?.options || [];
     if (lastWaitOptions.length) showHumanActions(lastWaitOptions);
+    traceState = mapTraceToAstIds(program, run.trace || []);
     renderTrace(els.runTrace, run.trace || [], run.node_status || [], true, run.wait);
+    refreshFlow();
     return;
   }
 
@@ -306,7 +325,9 @@ async function executeRun(options = {}) {
   lastExecutionId = null;
   const label = typeof run.result === "string" ? run.result : JSON.stringify(run.result);
   setStatus(`Finished — ${label}`, "ok");
+  traceState = mapTraceToAstIds(program, run.trace || []);
   renderTrace(els.runTrace, run.trace || [], run.node_status || [], false, null);
+  refreshFlow();
 }
 
 document.getElementById("btn-new").addEventListener("click", () => {
@@ -380,6 +401,31 @@ bindCanvas(els.canvas, () => program, {
 bindFlow(els.flow, () => program, {
   onSelect: (id) => setSelected(id),
   onAdd: (ownerId, slot, index) => addFromPalette(ownerId, slot, index),
+  onToggleDecl: () => {
+    collapsed.declarations = !collapsed.declarations;
+    refreshFlow();
+  },
+  onToggleWf: () => {
+    collapsed.workflows = !collapsed.workflows;
+    refreshFlow();
+  },
+  onRename: (id, name) => {
+    const node = getNode(program, id);
+    if (!node || !name) return;
+    setProp(node, "name", name);
+    refreshFlow();
+    refreshCanvas();
+    refreshSourceAndGraph();
+    refreshProps();
+  },
+  onHover: (id) => {
+    hoverAstId = id;
+    refreshFlow();
+  },
+  onHoverEnd: () => {
+    hoverAstId = null;
+    refreshFlow();
+  },
 });
 bindInspector(els.props, () => program, () => selectedId, inspectorHandlers);
 

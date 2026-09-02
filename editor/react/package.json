@@ -4,7 +4,7 @@
   "description": "React Flow visual editor for PPL programs",
   "main": "index.js",
   "scripts": {
-    "test": "node tests/ast_to_flow.test.mjs",
+    "test": "node tests/ast_to_flow.test.mjs && node tests/high_impact_features.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

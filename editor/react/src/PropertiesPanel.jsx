@@ -2,11 +2,63 @@
 // from the shared schema and writes edits back into the AST via model.js.
 import { BLOCKS, TYPES, OPERATORS } from "../../js/schema.js";
 import { getNode, getSlot, setProp, createNode, insertNode, removeNode } from "../../js/model.js";
+import { collectRefOptions } from "../../js/refLinks.js";
 
 const SIMPLE_KINDS = new Set(["field", "category", "option", "source", "rule", "memory_clause", "consider", "arg"]);
 
-function Field({ node, field, onEdit }) {
+function Field({ node, field, onEdit, program }) {
   const value = node[field.prop];
+
+  if (node.kind === "run" && field.prop === "name") {
+    const options = collectRefOptions(program, "run");
+    if (options.length) {
+      return (
+        <label className="pf-row">
+          <span>agent</span>
+          <select
+            value={value ?? ""}
+            onChange={(e) => {
+              setProp(node, field.prop, e.target.value);
+              onEdit();
+            }}
+          >
+            <option value="">— pick agent —</option>
+            {options.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+  }
+
+  if (node.kind === "receive" && field.prop === "name") {
+    const options = collectRefOptions(program, "receive");
+    if (options.length) {
+      return (
+        <label className="pf-row">
+          <span>input</span>
+          <select
+            value={value ?? ""}
+            onChange={(e) => {
+              setProp(node, field.prop, e.target.value);
+              onEdit();
+            }}
+          >
+            <option value="">— pick input —</option>
+            {options.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+  }
+
   const common = {
     value: field.kind === "check" ? undefined : value ?? "",
     onChange: (e) => {
@@ -75,7 +127,7 @@ function InlineSlot({ node, spec, onEdit, onStructure }) {
       {list.map((item) => (
         <div className="pf-item" key={item.id}>
           {(childDef.fields || []).map((field) => (
-            <Field key={field.prop} node={item} field={field} onEdit={onEdit} />
+            <Field key={field.prop} node={item} field={field} onEdit={onEdit} program={{ children: [] }} />
           ))}
           <button
             type="button"
@@ -94,7 +146,7 @@ function InlineSlot({ node, spec, onEdit, onStructure }) {
   );
 }
 
-export default function PropertiesPanel({ program, selectedId, onEdit, onStructure, onDelete }) {
+export default function PropertiesPanel({ program, selectedId, onEdit, onStructure, onDelete, issues = [] }) {
   const node = selectedId ? getNode(program, selectedId) : null;
   if (!node) {
     return <p className="pf-hint">Select a node on the canvas to edit its properties.</p>;
@@ -102,6 +154,7 @@ export default function PropertiesPanel({ program, selectedId, onEdit, onStructu
   const def = BLOCKS[node.kind] || {};
   const inlineSlots = (def.slots || []).filter((s) => (s.accept || []).every((k) => SIMPLE_KINDS.has(k)));
   const complex = (def.slots || []).filter((s) => !(s.accept || []).every((k) => SIMPLE_KINDS.has(k)));
+  const nodeIssues = issues.filter((i) => i.nodeId === node.id);
   return (
     <div className="pf">
       <div className="pf-title">
@@ -112,15 +165,24 @@ export default function PropertiesPanel({ program, selectedId, onEdit, onStructu
           </button>
         ) : null}
       </div>
+      {nodeIssues.length ? (
+        <ul className="pf-issues">
+          {nodeIssues.map((issue, i) => (
+            <li key={i} className={`pf-issue pf-issue-${issue.level}`}>
+              {issue.message}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {(def.fields || []).map((field) => (
-        <Field key={field.prop} node={node} field={field} onEdit={onEdit} />
+        <Field key={field.prop} node={node} field={field} onEdit={onEdit} program={program} />
       ))}
       {inlineSlots.map((spec) => (
         <InlineSlot key={spec.name} node={node} spec={spec} onEdit={onEdit} onStructure={onStructure} />
       ))}
       {complex.length ? (
         <p className="pf-hint">
-          Add {complex.map((s) => (s.label || s.name).toLowerCase()).join(", ")} from the toolbar “Add step”.
+          Add {complex.map((s) => (s.label || s.name).toLowerCase()).join(", ")} from the Blocks palette.
         </p>
       ) : null}
     </div>
