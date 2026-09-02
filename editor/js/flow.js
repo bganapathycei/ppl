@@ -64,7 +64,7 @@ function renderEdges(layout) {
   return `<svg class="flow-edges" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}">
     <defs>
       <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-        <path d="M 0 1 L 9 5 L 0 9 z" fill="#5b6378"/>
+        <path d="M 0 1 L 9 5 L 0 9 z" class="flow-arrow-head"/>
       </marker>
     </defs>${paths}${labels}</svg>`;
 }

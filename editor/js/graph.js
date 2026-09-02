@@ -82,7 +82,7 @@ function buildSvg(nodes) {
       const y2 = b.y + b.height / 2;
       const mid = (x1 + x2) / 2;
       edges.push(
-        `<path d="M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}" fill="none" stroke="#5b6378" stroke-width="1.4"/>`,
+        `<path class="graph-edge" d="M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}" fill="none" stroke-width="1.4"/>`,
       );
     }
   }
@@ -92,7 +92,7 @@ function buildSvg(nodes) {
       const label = `${node.operation} ${node.name && node.name !== node.operation ? node.name : ""}`.trim();
       return `<g>
         <rect class="node-${tone(node.operation)}" x="${p.x}" y="${p.y}" width="${p.width}" height="${p.height}" rx="7"/>
-        <text x="${p.x + 10}" y="${p.y + 22}" fill="#e7e9f0" font-size="11" font-family="Segoe UI, sans-serif">${xml(label.slice(0, 22))}</text>
+        <text class="graph-node-label" x="${p.x + 10}" y="${p.y + 22}" font-size="11" font-family="Segoe UI, sans-serif">${xml(label.slice(0, 22))}</text>
       </g>`;
     })
     .join("");

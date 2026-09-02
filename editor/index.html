@@ -1,9 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PPL Editor</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ppl-editor-theme") || "dark";
+        document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="css/themes.css">
   <link rel="stylesheet" href="css/editor.css">
 </head>
 <body>
@@ -33,7 +44,13 @@
         <button type="button" id="view-blocks" class="seg" title="Nested block view">Blocks</button>
       </div>
     </div>
-    <div id="status" class="status" role="status">Ready</div>
+    <div class="toolbar-end">
+      <div id="status" class="status" role="status">Ready</div>
+      <button type="button" id="theme-toggle" class="theme-toggle" data-theme-toggle aria-pressed="false" title="Switch to light theme">
+        <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+        <span class="theme-toggle-label">Dark</span>
+      </button>
+    </div>
     <input id="open-file" type="file" accept=".ppl,text/plain" hidden>
   </header>
 

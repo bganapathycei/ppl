@@ -16,6 +16,7 @@ import { renderTrace } from "./results.js";
 import { initAssistant } from "./assistant.js";
 import { refLinkedIds } from "./refLinks.js";
 import { mapTraceToAstIds } from "./traceMap.js";
+import { initTheme, bindThemeToggle } from "./theme.js";
 
 const STORAGE_KEY = "ppl-editor-v1";
 const INPUT_KEY = "ppl-editor-input-v1";
@@ -114,11 +115,16 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;");
 }
 
+let lastGraph = null;
+let lastGraphError = null;
+
 function refreshCanvas() {
   renderCanvas(els.canvas, program);
 }
 
 function refreshGraphView(graph, error) {
+  lastGraph = graph;
+  lastGraphError = error;
   renderGraph(els.graph, graph, error);
   requestAnimationFrame(() => fitGraph(els.graph));
 }
@@ -453,6 +459,14 @@ bindGraph(els.graph);
 document.getElementById("graph-fit").addEventListener("click", () => fitGraph(els.graph));
 document.getElementById("graph-zoom-in").addEventListener("click", () => zoomGraph(els.graph, 1.15));
 document.getElementById("graph-zoom-out").addEventListener("click", () => zoomGraph(els.graph, 0.87));
+
+initTheme();
+bindThemeToggle(document.getElementById("theme-toggle"));
+
+window.addEventListener("ppl-theme-change", () => {
+  refreshFlow();
+  refreshGraphView(lastGraph, lastGraphError);
+});
 
 initAssistant(els.assistant, {
   getSource: () => generatePpl(program),

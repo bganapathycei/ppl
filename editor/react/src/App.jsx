@@ -48,15 +48,22 @@ import { validate } from "../../js/validate.js";
 
 import { mapTraceToAstIds } from "../../js/traceMap.js";
 import { refLinkedIds } from "../../js/refLinks.js";
+import ThemeToggle from "./ThemeToggle.jsx";
+import { useEditorTheme, themeColor } from "./useEditorTheme.js";
 
 const EXAMPLES = ["hello_world", "incident", "governed_change", "enterprise_automation"];
 
-const EDGE_DEFAULTS = {
-  markerEnd: { type: MarkerType.ArrowClosed, color: "#5b6378", width: 18, height: 18 },
-  style: { stroke: "#5b6378", strokeWidth: 1.6 },
-};
+function edgeDefaults(stroke) {
+  return {
+    markerEnd: { type: MarkerType.ArrowClosed, color: stroke, width: 18, height: 18 },
+    style: { stroke, strokeWidth: 1.6 },
+  };
+}
 
 function Editor() {
+  const theme = useEditorTheme();
+  const edgeStroke = themeColor("--edge-stroke") || (theme === "light" ? "#8a92a8" : "#5b6378");
+  const edgeOptions = useMemo(() => edgeDefaults(edgeStroke), [edgeStroke]);
   const programRef = useRef(helloWorldDocument());
 
   const [version, bump] = useReducer((x) => x + 1, 0);
@@ -641,7 +648,10 @@ function Editor() {
 
         </button>
 
-        <span className={`status ${statusLevel}`}>{status}</span>
+        <div className="topbar-end">
+          <span className={`status ${statusLevel}`}>{status}</span>
+          <ThemeToggle />
+        </div>
 
       </header>
 
@@ -667,7 +677,7 @@ function Editor() {
 
             nodeTypes={nodeTypes}
 
-            defaultEdgeOptions={EDGE_DEFAULTS}
+            defaultEdgeOptions={edgeOptions}
 
             onNodeClick={onNodeClick}
 
@@ -687,11 +697,11 @@ function Editor() {
 
           >
 
-            <Background color="#252a38" gap={18} />
+            <Background color={themeColor("--canvas-grid") || "#252a38"} gap={18} />
 
             <Controls />
 
-            <MiniMap pannable zoomable className="mini" nodeColor={() => "#2a2f3e"} />
+            <MiniMap pannable zoomable className="mini" nodeColor={() => themeColor("--btn-bg") || "#2a2f3e"} />
 
           </ReactFlow>
 
