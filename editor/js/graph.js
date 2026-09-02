@@ -5,6 +5,10 @@ const CLASS_OF = {
   REASON: "c",
 };
 
+const view = { tx: 12, ty: 12, scale: 1 };
+let stageEl = null;
+let lastLayout = null;
+
 function xml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -60,16 +64,11 @@ function layout(nodes) {
   return { pos, maxX, maxY, width, height };
 }
 
-export function renderGraph(container, graph, error, meta = "") {
-  const nodes = graph?.nodes || [];
-  if (error && !nodes.length) {
-    container.innerHTML = `<p class="graph-error">${xml(error)}</p>`;
-    return;
-  }
-  if (!nodes.length) {
-    container.innerHTML = `<p class="graph-meta">${xml(meta || "No graph nodes yet.")}</p>`;
-    return;
-  }
+function applyTransform() {
+  if (stageEl) stageEl.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`;
+}
+
+function buildSvg(nodes) {
   const { pos, maxX, maxY } = layout(nodes);
   const edges = [];
   for (const node of nodes) {
@@ -97,6 +96,90 @@ export function renderGraph(container, graph, error, meta = "") {
       </g>`;
     })
     .join("");
+  return {
+    width: maxX,
+    height: maxY,
+    markup: `<svg xmlns="http://www.w3.org/2000/svg" width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}">${edges.join("")}${boxes}</svg>`,
+  };
+}
+
+export function renderGraph(container, graph, error, meta = "") {
+  const nodes = graph?.nodes || [];
+  if (error && !nodes.length) {
+    container.innerHTML = `<p class="graph-error">${xml(error)}</p>`;
+    stageEl = null;
+    lastLayout = null;
+    return;
+  }
+  if (!nodes.length) {
+    container.innerHTML = `<p class="graph-empty">${xml(meta || "No graph nodes yet.")}</p>`;
+    stageEl = null;
+    lastLayout = null;
+    return;
+  }
+
+  const built = buildSvg(nodes);
+  lastLayout = { width: built.width, height: built.height };
   const banner = error ? `<p class="graph-error">${xml(error)}</p>` : "";
-  container.innerHTML = `${banner}<svg xmlns="http://www.w3.org/2000/svg" width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}">${edges.join("")}${boxes}</svg>`;
+  container.innerHTML = `${banner}<div class="graph-stage" style="width:${built.width}px;height:${built.height}px">${built.markup}</div>`;
+  stageEl = container.querySelector(".graph-stage");
+  applyTransform();
+}
+
+export function fitGraph(container) {
+  if (!lastLayout || !stageEl) return;
+  const availW = Math.max(40, container.clientWidth - 20);
+  const availH = Math.max(40, container.clientHeight - 20);
+  const scale = Math.min(1, availW / lastLayout.width, availH / lastLayout.height);
+  view.scale = Math.max(0.2, scale || 1);
+  view.tx = 12;
+  view.ty = 12;
+  applyTransform();
+}
+
+export function zoomGraph(container, factor) {
+  if (!stageEl) return;
+  view.scale = Math.min(2.5, Math.max(0.2, view.scale * factor));
+  applyTransform();
+}
+
+export function bindGraph(container) {
+  container.addEventListener(
+    "wheel",
+    (event) => {
+      if (!stageEl) return;
+      event.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const px = event.clientX - rect.left;
+      const py = event.clientY - rect.top;
+      const prev = view.scale;
+      const next = Math.min(2.5, Math.max(0.2, prev * (event.deltaY < 0 ? 1.1 : 0.9)));
+      const k = next / prev;
+      view.tx = px - (px - view.tx) * k;
+      view.ty = py - (py - view.ty) * k;
+      view.scale = next;
+      applyTransform();
+    },
+    { passive: false },
+  );
+
+  let panning = null;
+  container.addEventListener("pointerdown", (event) => {
+    if (!stageEl || event.button !== 0) return;
+    panning = { x: event.clientX, y: event.clientY, tx: view.tx, ty: view.ty };
+    container.classList.add("panning");
+    container.setPointerCapture(event.pointerId);
+  });
+  container.addEventListener("pointermove", (event) => {
+    if (!panning) return;
+    view.tx = panning.tx + (event.clientX - panning.x);
+    view.ty = panning.ty + (event.clientY - panning.y);
+    applyTransform();
+  });
+  const endPan = () => {
+    panning = null;
+    container.classList.remove("panning");
+  };
+  container.addEventListener("pointerup", endPan);
+  container.addEventListener("pointercancel", endPan);
 }

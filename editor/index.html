@@ -73,9 +73,16 @@
         <div id="run-trace" class="run-trace"></div>
       </div>
       <div class="inspector-pane graph-pane">
-        <h2>Execution graph</h2>
+        <div class="pane-head">
+          <h2>Execution graph</h2>
+          <div class="graph-tools" aria-label="Graph zoom controls">
+            <button type="button" id="graph-fit" title="Fit to view">Fit</button>
+            <button type="button" id="graph-zoom-out" title="Zoom out">−</button>
+            <button type="button" id="graph-zoom-in" title="Zoom in">+</button>
+          </div>
+        </div>
         <p id="graph-meta" class="graph-meta"></p>
-        <div id="graph" class="graph"></div>
+        <div id="graph" class="graph-viewport" aria-label="Compiled execution graph"></div>
       </div>
     </aside>
     <aside id="assistant" class="assistant" aria-label="AI coding assistant"></aside>

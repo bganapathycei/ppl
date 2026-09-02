@@ -5,7 +5,7 @@ import { renderInspector, bindInspector } from "./inspector.js";
 import { generatePpl, appName } from "./codegen.js";
 import { parsePpl } from "./parse.js";
 import { compileProgram, fallbackGraph } from "./compile.js";
-import { renderGraph } from "./graph.js";
+import { renderGraph, fitGraph, zoomGraph, bindGraph } from "./graph.js";
 import { validate, issuesByNodeId } from "./validate.js";
 import { accepts } from "./schema.js";
 import { createNode, getNode, insertNode, getSlot, helloWorldDocument, setProp } from "./model.js";
@@ -118,6 +118,11 @@ function refreshCanvas() {
   renderCanvas(els.canvas, program);
 }
 
+function refreshGraphView(graph, error) {
+  renderGraph(els.graph, graph, error);
+  requestAnimationFrame(() => fitGraph(els.graph));
+}
+
 function refreshFlow() {
   const issuesByNode = issuesByNodeId(program);
   const refLinked = refLinkedIds(program, hoverAstId);
@@ -212,13 +217,13 @@ async function updateGraph(source) {
         ? `Compiled ${compiled.application || ""}`
         : "Compiler error"
       : "";
-    renderGraph(els.graph, compiled.graph, compiled.error);
+    refreshGraphView(compiled.graph, compiled.error);
     if (compiled.error) setStatus(compiled.error, "err");
     else if (compiled.ok) setStatus(`Compiled ${compiled.application || "program"}`, "ok");
     return;
   }
   els.graphMeta.textContent = "Start python editor/serve.py to compile, run, and preview graphs";
-  renderGraph(els.graph, fallbackGraph(program), null);
+  refreshGraphView(fallbackGraph(program), null);
 }
 
 function loadDocument(next) {
@@ -359,7 +364,7 @@ document.getElementById("btn-validate").addEventListener("click", async () => {
   }
   if (compiled.ok) setStatus(`Valid — ${compiled.application}`, "ok");
   else setStatus(compiled.error || "Invalid", "err");
-  renderGraph(els.graph, compiled.graph, compiled.error);
+  refreshGraphView(compiled.graph, compiled.error);
 });
 
 document.getElementById("btn-run").addEventListener("click", () => executeRun());
@@ -444,6 +449,10 @@ document.getElementById("view-blocks").addEventListener("click", () => setView("
 document.getElementById("flow-fit").addEventListener("click", () => fitFlow(els.flow));
 document.getElementById("flow-zoom-in").addEventListener("click", () => zoomFlow(els.flow, 1.15));
 document.getElementById("flow-zoom-out").addEventListener("click", () => zoomFlow(els.flow, 0.87));
+bindGraph(els.graph);
+document.getElementById("graph-fit").addEventListener("click", () => fitGraph(els.graph));
+document.getElementById("graph-zoom-in").addEventListener("click", () => zoomGraph(els.graph, 1.15));
+document.getElementById("graph-zoom-out").addEventListener("click", () => zoomGraph(els.graph, 0.87));
 
 initAssistant(els.assistant, {
   getSource: () => generatePpl(program),
