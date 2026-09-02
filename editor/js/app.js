@@ -1,6 +1,6 @@
 import { renderPalette } from "./palette.js";
 import { bindCanvas, renderCanvas } from "./canvas.js";
-import { renderFlow, bindFlow, fitFlow, zoomFlow } from "./flow.js";
+import { renderFlow, bindFlow, fitFlow, zoomFlow, applyFlowDecorations } from "./flow.js";
 import { renderInspector, bindInspector } from "./inspector.js";
 import { generatePpl, appName } from "./codegen.js";
 import { parsePpl } from "./parse.js";
@@ -431,11 +431,14 @@ bindFlow(els.flow, () => program, {
   },
   onHover: (id) => {
     hoverAstId = id;
-    refreshFlow();
+    applyFlowDecorations(els.flow, {
+      hoverAstId: id,
+      refLinked: refLinkedIds(program, id),
+    });
   },
   onHoverEnd: () => {
     hoverAstId = null;
-    refreshFlow();
+    applyFlowDecorations(els.flow, { hoverAstId: null, refLinked: new Set() });
   },
 });
 bindInspector(els.props, () => program, () => selectedId, inspectorHandlers);

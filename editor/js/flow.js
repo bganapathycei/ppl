@@ -105,7 +105,7 @@ export function renderFlow(container, program, selectedId, options = {}) {
   lastLayout = layout;
   const containerHtml = layout.container ? renderContainer(layout.container, selectedId) : "";
   const nodes = layout.items.map((item) => renderNode(item, selectedId)).join("");
-  container.innerHTML = `<div class="flow-stage" style="width:${layout.width}px;height:${layout.height}px">${renderEdges(layout)}${containerHtml}${nodes}</div>`;
+  container.innerHTML = `<div class="flow-stage" style="width:${layout.width}px;height:${layout.height}px">${renderEdges(layout)}${containerHtml}<div class="flow-nodes">${nodes}</div></div>`;
   stageEl = container.querySelector(".flow-stage");
   applyTransform();
 }
@@ -124,6 +124,14 @@ export function fitFlow(container) {
 export function zoomFlow(container, factor) {
   view.scale = Math.min(2.2, Math.max(0.2, view.scale * factor));
   applyTransform();
+}
+
+export function applyFlowDecorations(root, { hoverAstId, refLinked } = {}) {
+  if (!root) return;
+  root.querySelectorAll(".flow-node.selectable").forEach((el) => {
+    const id = el.dataset.id;
+    el.classList.toggle("ref-highlight", Boolean(id && (refLinked?.has(id) || id === hoverAstId)));
+  });
 }
 
 function startInlineRename(target) {
@@ -168,14 +176,14 @@ export function bindFlow(container, getProgram, handlers) {
       handlers.onAdd(add.dataset.addOwner, add.dataset.addSlot, Number(add.dataset.addIndex));
       return;
     }
-    const containerNode = event.target.closest(".flow-container.selectable");
-    if (containerNode) {
-      handlers.onSelect(containerNode.dataset.id);
-      return;
-    }
     const node = event.target.closest(".flow-node.selectable");
     if (node) {
       handlers.onSelect(node.dataset.id);
+      return;
+    }
+    const containerNode = event.target.closest(".flow-container.selectable");
+    if (containerNode) {
+      handlers.onSelect(containerNode.dataset.id);
       return;
     }
     if (!event.target.closest(".flow-node, .flow-add, .flow-container")) handlers.onSelect(null);
